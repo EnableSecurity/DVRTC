@@ -1,0 +1,35 @@
+# Baresip configuration for digest leak demo
+
+# Module path for Debian
+module_path		/usr/lib/baresip/modules
+
+# Audio settings for headless operation - aubridge loopback
+audio_player		aubridge,loopback
+audio_source		aubridge,loopback
+audio_alert		aubridge,loopback
+
+# Disable video
+video_source
+video_display
+
+# SIP settings - bind to localhost only so kamailio sees local source IP
+# (kamailio rejects extension 2000 registration from external IPs)
+sip_listen		127.0.0.1:5082
+
+# Call settings
+call_local_timeout	3
+call_max_calls		10
+
+# Audio codec
+audio_codecs		PCMU/8000/1,PCMA/8000/1
+
+# ctrl_tcp for hangup control
+ctrl_tcp_listen		127.0.0.1:4444
+
+# Module loading
+module			menu.so
+module			account.so
+module			g711.so
+module			aubridge.so
+module			uuid.so
+module			ctrl_tcp.so

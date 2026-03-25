@@ -1,0 +1,394 @@
+# DVRTC - Damn Vulnerable Real-Time Communications
+# WARNING: This system is INTENTIONALLY VULNERABLE - deploy only on dedicated hosts with no production systems
+
+x-logging:
+  &default-logging
+  options:
+    max-size: '12m'
+    max-file: '5'
+  driver: local
+
+x-required-public-ipv4:
+  &required-public-ipv4
+  PUBLIC_IPV4: "${PUBLIC_IPV4:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before 'docker compose up'. See README.md Initial Setup.}"
+
+x-required-mysql-root-password:
+  &required-mysql-root-password
+  MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before 'docker compose up'. See README.md Initial Setup.}"
+
+x-required-sipcaller-password:
+  &required-sipcaller-password
+  SIPCALLER1_PASSWORD: "${SIPCALLER1_PASSWORD:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before 'docker compose up'. See README.md Initial Setup.}"
+
+services:
+  # Asterisk PBX - Backend call processing
+  # INTENTIONALLY VULNERABLE: Weak passwords (1000:1500), no rate limiting, RTP vulnerabilities
+  asterisk:
+    image: ghcr.io/enablesecurity/dvrtc/asterisk:v0.1.1
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    environment:
+      <<: *required-sipcaller-password
+    volumes:
+      - type: volume
+        source: voicemail
+        target: /var/spool/asterisk/voicemail/default/1100
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    network_mode: "host"  # Required for RTP media handling
+    healthcheck:
+      test: ["CMD", "asterisk-healthcheck"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 45s
+
+  # RTPEngine - Media proxy for RTP/SRTP
+  # INTENTIONALLY VULNERABLE: Configured to allow RTP bleed and injection attacks
+  rtpengine:
+    image: ghcr.io/enablesecurity/dvrtc/rtpengine:v0.1.1
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    network_mode: "host"  # Required for RTP media handling
+    environment:
+      <<: *required-public-ipv4
+      PUBLIC_IPV6: ${PUBLIC_IPV6:-}
+    healthcheck:
+      test: ["CMD", "rtpengine-healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Kamailio - SIP proxy/registrar (front-end)
+  # INTENTIONALLY VULNERABLE: Returns detailed responses enabling enumeration, extension 2000 digest leak
+  kamailio:
+    image: ghcr.io/enablesecurity/dvrtc/kamailio:v0.1.1
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    depends_on:
+        rtpengine:
+          condition: service_healthy
+        asterisk:
+          condition: service_healthy
+        db:
+            condition: service_healthy
+    network_mode: "host"  # Required for multi-protocol SIP support (UDP/TCP/TLS/WS/WSS)
+    healthcheck:
+      test: ["CMD", "kamailio-healthcheck"]
+      interval: 30s
+      timeout: 40s
+      retries: 3
+      start_period: 30s
+    environment:
+      <<: [*required-public-ipv4, *required-mysql-root-password]
+      PUBLIC_IPV6: "${PUBLIC_IPV6:-}"
+      EMAIL: "${EMAIL:-}"
+      DOMAIN: "${DOMAIN:-}"
+      MYSQL_PORT: "${MYSQL_PORT:-23306}"
+    volumes:
+      - type: bind
+        source: ./data/certs
+        target: /etc/certstore
+      - type: volume
+        source: mysqlsock
+        target: /var/run/mysqld/
+
+  # Baresip Call Generators - Lightweight SIP clients for automated calls
+  # Three staggered callers keep extension 1300 busy for RTP bleed demos
+  # without the CPU cost of the previous 40-replica fanout.
+  baresip-callgen:
+    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.1.1
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      SIPCALLER1_PASSWORD: "${SIPCALLER1_PASSWORD:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before 'docker compose up'. See README.md Initial Setup.}"
+      CALL_DEST: 1300
+      CALL_DURATION: 20
+      CALL_PAUSE: 0
+      CALL_START_DELAY: 0
+    depends_on:
+      kamailio:
+        condition: service_healthy
+        restart: true
+      asterisk:
+        condition: service_healthy
+        restart: true
+
+  baresip-callgen-b:
+    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.1.1
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      SIPCALLER1_PASSWORD: "${SIPCALLER1_PASSWORD:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before 'docker compose up'. See README.md Initial Setup.}"
+      CALL_DEST: 1300
+      CALL_DURATION: 20
+      CALL_PAUSE: 0
+      CALL_START_DELAY: 8
+    depends_on:
+      kamailio:
+        condition: service_healthy
+        restart: true
+      asterisk:
+        condition: service_healthy
+        restart: true
+
+  baresip-callgen-c:
+    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.1.1
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      SIPCALLER1_PASSWORD: "${SIPCALLER1_PASSWORD:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before 'docker compose up'. See README.md Initial Setup.}"
+      CALL_DEST: 1300
+      CALL_DURATION: 20
+      CALL_PAUSE: 0
+      CALL_START_DELAY: 16
+    depends_on:
+      kamailio:
+        condition: service_healthy
+        restart: true
+      asterisk:
+        condition: service_healthy
+        restart: true
+
+  # Baresip Digest Leak - Registers extension 2000 for digest leak demonstration
+  # Auto-answers calls and immediately hangs up to trigger authentication challenges
+  baresip-digestleak:
+    image: ghcr.io/enablesecurity/dvrtc/baresip-digestleak:v0.1.1
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    network_mode: "host"
+    depends_on:
+      kamailio:
+        condition: service_healthy
+        restart: true
+
+  # Nginx - Web server
+  # INTENTIONALLY VULNERABLE: Exposes voicemail directory listing and user-agent logs
+  nginx:
+    image: ghcr.io/enablesecurity/dvrtc/nginx:v0.1.1
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - type: volume
+        source: voicemail
+        target: /var/www/html/voicemail
+      - type: volume
+        source: acme-challenge
+        target: /var/www/html/.well-known/acme-challenge
+      - type: bind
+        source: ./data/certs
+        target: /etc/certstore
+      - type: volume
+        source: wwwlog
+        target: /var/www/html/logs/useragents
+    environment:
+      <<: *required-public-ipv4
+      EMAIL: "${EMAIL:-}"
+      DOMAIN: "${DOMAIN:-}"
+      PUBLIC_IPV6: "${PUBLIC_IPV6:-}"
+    healthcheck:
+      test: ["CMD", "nginx-healthcheck"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 10s
+
+  # Voicemail Cleaner - Prevents disk exhaustion from testing
+  voicemailcleaner:
+    image: ghcr.io/enablesecurity/dvrtc/voicemailcleaner:v0.1.1
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: voicemail
+        target: /voicemail
+    depends_on:
+      - asterisk
+    network_mode: "none"  # No network access required
+
+  # Certbot - LetsEncrypt certificate automation
+  certbot:
+    logging: *default-logging
+    restart: unless-stopped
+    image: certbot/certbot:v5.4.0
+    volumes:
+      - type: volume
+        source: acme-challenge
+        target: /var/www/html/.well-known/acme-challenge
+      - type: bind
+        source: ./data/certs
+        target: /etc/certstore
+    environment:
+      - EMAIL
+      - DOMAIN
+    entrypoint: "/bin/sh -c 'trap exit TERM; if [ -z \"$DOMAIN\" ]; then echo \"No domain specified, certbot will not run\"; sleep infinity; fi; while :; do certbot certonly -n -d $DOMAIN --agree-tos --webroot -w /var/www/html --email $EMAIL --deploy-hook \"owner=$$(stat -c %u:%g /etc/certstore) && cp /etc/letsencrypt/live/$DOMAIN/* /etc/certstore && chown $$owner /etc/certstore/*\"; sleep 12h & wait $${!}; done;'"
+
+  # coturn - TURN/STUN server for NAT traversal
+  # INTENTIONALLY VULNERABLE: Hardcoded credentials (user:joshua, CLI:coturn)
+  coturn:
+    logging: *default-logging
+    restart: unless-stopped
+    image: coturn/coturn:4.9.0-r0
+    network_mode: "host"  # Required for TURN/STUN protocol
+    volumes:
+      - type: bind
+        source: ./data/certs
+        target: /etc/certstore
+    entrypoint:
+      - /bin/sh
+      - -ec
+    environment:
+      <<: *required-public-ipv4
+      PUBLIC_IPV6: "${PUBLIC_IPV6:-}"
+    command:
+      - |
+        set -- \
+          -n \
+          --log-file=stdout \
+          --lt-cred-mech \
+          --listening-ip=127.0.0.1 \
+          --listening-ip="${PUBLIC_IPV4}" \
+          --denied-peer-ip=0.0.0.0-255.255.255.255 \
+          --allowed-peer-ip=127.0.0.1 \
+          --allowed-peer-ip=10.0.0.0-10.255.255.255 \
+          --allowed-peer-ip=172.16.0.0-172.31.255.255 \
+          --allowed-peer-ip=192.168.0.0-192.168.255.255 \
+          --allowed-peer-ip="${PUBLIC_IPV4}" \
+          --user=user:joshua \
+          --allow-loopback-peers \
+          --cli-password=coturn \
+          -r dvrtc.local \
+          --response-origin-only-with-rfc5780 \
+          --no-software-attribute \
+          --no-rfc5780 \
+          --cert=/etc/certstore/fullchain.pem \
+          --pkey=/etc/certstore/privkey.pem
+        if [ -n "${PUBLIC_IPV6}" ]; then
+          set -- "$@" \
+            --listening-ip="${PUBLIC_IPV6}" \
+            --denied-peer-ip=::-ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff \
+            --allowed-peer-ip=::1 \
+            --allowed-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff \
+            --allowed-peer-ip="${PUBLIC_IPV6}"
+        fi
+        exec turnserver "$@"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - |
+          timeout 10 turnutils_uclient -y -u user -w joshua -n 1 -p 3478 127.0.0.1 >/dev/null 2>&1 &&
+          if [ -n "$PUBLIC_IPV6" ]; then
+            timeout 10 turnutils_uclient -y -x -u user -w joshua -n 1 -p 3478 "$PUBLIC_IPV6" >/dev/null 2>&1
+          fi
+      interval: 2m
+      timeout: 20s
+      retries: 3
+      start_period: 15s
+
+  # MySQL Client - Exports user-agent statistics to JSON
+  mysqlclient:
+    image: ghcr.io/enablesecurity/dvrtc/mysqlclient:v0.1.1
+    platform: linux/amd64
+    volumes:
+    - type: volume
+      source: wwwlog
+      target: /log
+    network_mode: "host"  # Requires MySQL access
+    environment:
+      MYSQL_PORT: "${MYSQL_PORT:-23306}"
+    depends_on:
+        db:
+            condition: service_healthy
+        kamailio:
+            condition: service_healthy
+
+  # Database Cleaner - Truncates user-agent table hourly
+  dbcleaner:
+    image: ghcr.io/enablesecurity/dvrtc/dbcleaner:v0.1.1
+    platform: linux/amd64
+    network_mode: "host"  # Requires MySQL access
+    environment:
+      MYSQL_PORT: "${MYSQL_PORT:-23306}"
+    depends_on:
+        db:
+            condition: service_healthy
+        kamailio:
+            condition: service_healthy
+
+  # MySQL Database
+  # INTENTIONALLY VULNERABLE: Exposed on non-standard port with hardcoded password (kamailiorw)
+  db:
+    image: ghcr.io/enablesecurity/dvrtc/db:v0.1.1
+    platform: linux/amd64
+    network_mode: "host"  # Host networking for compatibility with other host-networked services
+    environment:
+      <<: *required-mysql-root-password
+      MYSQL_USER: kamailio
+      MYSQL_PASSWORD: kamailiorw  # INTENTIONALLY WEAK PASSWORD
+      MYSQL_TCP_PORT: "${MYSQL_PORT:-23306}"  # INTENTIONALLY EXPOSED on non-standard port
+    volumes:
+      - type: volume
+        source: mysqlsock
+        target: /var/run/mysqld/
+    healthcheck:
+        test: ["CMD-SHELL", "mysqladmin ping -h localhost --port ${MYSQL_TCP_PORT:-23306}"]
+        timeout: 20s
+        retries: 10
+    cap_add:
+      - SYS_NICE  # Required for MySQL performance
+
+  # Testing runner - one-off host-local capture, diagnostics, and regression checks
+  # Use with: docker compose run --rm testing ...
+  # Not part of the normal long-lived stack started by docker compose up -d
+  testing:
+    image: ghcr.io/enablesecurity/dvrtc/testing:v0.1.1
+    platform: linux/amd64
+    network_mode: "host"
+    privileged: true
+    environment:
+      PUBLIC_IPV4: "${PUBLIC_IPV4:-}"
+      PUBLIC_IPV6: "${PUBLIC_IPV6:-}"
+    volumes:
+      - type: bind
+        source: ./artifacts
+        target: /work
+    profiles:
+      - testing  # Include this profile when building locally; use docker compose run --rm for execution
+
+  # Attacker runner - one-off bridge-networked remote attack vantage point
+  # Use with: docker compose run --rm attacker ...
+  # Not part of the normal long-lived stack started by docker compose up -d
+  attacker:
+    image: ghcr.io/enablesecurity/dvrtc/testing:v0.1.1
+    platform: linux/amd64
+    environment:
+      PUBLIC_IPV4: "${PUBLIC_IPV4:-}"
+      PUBLIC_IPV6: "${PUBLIC_IPV6:-}"
+    volumes:
+      - type: bind
+        source: ./artifacts
+        target: /work
+    profiles:
+      - testing  # Include this profile when building locally; use docker compose run --rm for execution
+
+volumes:
+  voicemail:      # Voicemail storage for extension 1100
+  acme-challenge: # LetsEncrypt ACME challenge directory
+  wwwlog:         # User-Agent tracking logs
+  mysqlsock:      # MySQL Unix socket for IPC

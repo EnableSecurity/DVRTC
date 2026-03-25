@@ -1,0 +1,3 @@
+# Baresip SIP account for call generation
+# Format: <sip:user@domain>;auth_pass=password;regint=0
+<sip:sipcaller1@127.0.0.1>;auth_pass=__SIPCALLER1_PASSWORD__;regint=0;outbound="sip:127.0.0.1:5060"

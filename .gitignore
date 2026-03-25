@@ -1,0 +1,29 @@
+# Environment files with secrets
+.env
+
+# Generated certificates and TLS data
+data/
+
+# OS files
+.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*~
+\#*\#
+.\#*
+
+# Local tooling state
+.claude/
+.pytest_cache/
+
+# Docker override (user-specific)
+docker-compose.override.yml
+
+# Runtime / generated data
+*.log
+*.pcap
+*.pid
+*.pyc

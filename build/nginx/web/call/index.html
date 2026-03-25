@@ -1,0 +1,343 @@
+<html>
+  <head>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <script src="js/jssip-3.9.0.js"></script>
+    <style>
+      @import url(css/pressstart.css);
+      body{
+        background:#00000c;
+        color:#B0FDFF;
+        font-family: 'Press Start 2P', sans-serif;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        text-transform:uppercase;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+      }
+      .header {
+        font-size: 14px;
+        text-shadow: 0 0 26px #7ebdbe;
+        margin-bottom: 5px;
+      }
+      .subheader {
+        font-size: 9px;
+        color: #5d9293;
+        margin-bottom: 20px;
+      }
+      .back {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        font-size: 9px;
+      }
+      .back a {
+        color: #5d9293;
+        text-decoration: none;
+      }
+      .back a:hover {
+        color: #B0FDFF;
+      }
+      input {
+        background-color: black;
+        font-family: 'Press Start 2P', sans-serif;
+        font-size: 12px;
+        color:#5d9293;
+        text-shadow:0 0 14px #5d9293;
+      }
+      #status {
+        font-size: 12px;
+      }
+      .padbtn {
+        border: 1pt solid #5d9293;
+        background: black;
+        color: #B0FDFF;
+        width: 65px;
+        height: 65px;
+        font-family: 'Press Start 2P', sans-serif;
+        font-size: 24px;
+        font-weight: bold;
+        text-shadow:0 0 14px #5d9293;
+      }
+
+      .padbtnon {
+        border: 1pt solid #5d9293;
+        background: #2d4546;
+        color: #5d9293;
+        width: 65px;
+        height: 65px;
+        font-family: 'Press Start 2P', sans-serif;
+        font-size: 24px;
+        font-weight: bold;
+        text-shadow:0 0 14px #5d9293;
+      }
+
+      #num {
+        border-collapse: collapse;
+        width: 195px;
+        background-color: black;
+        font-size: 32px;
+        color: #5d9293;
+        border-color: #5d9293;
+        border-radius: 0;
+        border: 1pt solid #5d9293;
+        padding: 10px;
+      }
+
+      .padaction {
+        width: 195px;
+        background: #5d9293;
+        font-family: 'Press Start 2P', sans-serif;
+        font-size: 16px;
+        padding: 15px;
+        border-collapse: collapse;
+        border: 1pt solid  #B0FDFF;
+        color: #000000;
+      }
+
+      .instructions {
+        font-family: 'Press Start 2P', sans-serif;
+        font-size: 12px;
+        color: #808080;
+      }
+    </style>
+  </head>
+  <body>
+    <audio src="ringbacktone.wav" id="ringback" class="hidden" preload="auto" loop></audio>
+    <audio src="snd/0.ogg" id="n0" class="hidden" preload="audio"></audio>
+    <audio src="snd/1.ogg" id="n1" class="hidden" preload="audio"></audio>
+    <audio src="snd/2.ogg" id="n2" class="hidden" preload="audio"></audio>
+    <audio src="snd/3.ogg" id="n3" class="hidden" preload="audio"></audio>
+    <audio src="snd/4.ogg" id="n4" class="hidden" preload="audio"></audio>
+    <audio src="snd/5.ogg" id="n5" class="hidden" preload="audio"></audio>
+    <audio src="snd/6.ogg" id="n6" class="hidden" preload="audio"></audio>
+    <audio src="snd/7.ogg" id="n7" class="hidden" preload="audio"></audio>
+    <audio src="snd/8.ogg" id="n8" class="hidden" preload="audio"></audio>
+    <audio src="snd/9.ogg" id="n9" class="hidden" preload="audio"></audio>
+    <script>
+        function el(id) {
+          return document.getElementById(id);
+        }
+
+        function setText(id, value) {
+          el(id).textContent = value;
+        }
+
+        function setValue(id, value) {
+          el(id).value = value;
+        }
+
+        function getValue(id) {
+          return el(id).value;
+        }
+
+        function show(id) {
+          el(id).style.display = "";
+        }
+
+        function hide(id) {
+          el(id).style.display = "none";
+        }
+
+        function pauseAudio(id) {
+          el(id).pause();
+        }
+
+        function resetAudio(id) {
+          var audio = el(id);
+          audio.currentTime = 0;
+          audio.play();
+        }
+
+        function appendDigit(digit) {
+          setValue("num", getValue("num") + digit);
+        }
+
+        function flashButton(id) {
+          var button = el(id);
+          button.className = "padbtnon";
+          setTimeout(function() {
+            button.className = "padbtn";
+          }, 100);
+        }
+
+        function blurOnFocus() {
+          this.blur();
+        }
+
+        function isIpv6Literal(host) {
+          return host.indexOf(":") !== -1 && host.indexOf("[") === -1;
+        }
+
+        function hostForUri(host) {
+          return isIpv6Literal(host) ? "[" + host + "]" : host;
+        }
+
+        function dialTarget(target, host) {
+          if (/^sips?:/i.test(target) || target.indexOf("@") !== -1) {
+            return target;
+          }
+          return "sip:" + target + "@" + host;
+        }
+
+        var rawHost = window.location.hostname;
+        var uriHost = hostForUri(rawHost);
+        var socket = new JsSIP.WebSocketInterface("wss://" + uriHost + ":8443");
+        var configuration = {
+          sockets: [socket],
+          uri: "sip:1000@" + uriHost,
+          password: "1500",
+        };
+
+        var phone = new JsSIP.UA(configuration);
+        phone.start();
+        phone.on("registrationFailed", function(e) {
+          alert("registration failed!");
+          hide("callbtn");
+          hide("discbtn");
+        });
+        phone.on("registered", function (e) {
+          show("callbtn");
+          hide("discbtn");
+        });
+
+      function disconnect() {
+        if (phone) phone.terminateSessions();
+        pauseAudio("ringback");
+        setValue("num", "");
+        setText("status", "");
+        show("callbtn");
+        hide("discbtn");
+      }
+
+      function performCall() {
+        setText("status", "trying...");
+        var eventHandlers = {
+            'accepted': function (e) {
+              console.log("call accepted");
+              setText("status", "call accepted");
+              pauseAudio("ringback");
+            },
+            'failed': function (e) {
+              console.log("call failed with cause: " + e.cause);
+              setValue("num", "");
+              setText("status", "failed: " + e.cause);
+              show("callbtn");
+              hide("discbtn");
+              pauseAudio("ringback");
+            },
+            'ended': function (e) {
+              setValue("num", "");
+              setText("status", "");
+              show("callbtn");
+              hide("discbtn");
+              pauseAudio("ringback");
+            },
+          };
+
+        hide("callbtn");
+        show("discbtn");
+          var options = {
+            eventHandlers: eventHandlers,
+            mediaConstraints: { audio: true, video: false },
+            pcConfig: {
+              iceServers: [
+                  {
+                    'urls': 'turn:' + uriHost + ':3478',
+                    'username': 'user',
+                    'credential': 'joshua'
+                  }
+              ],
+              rtcpMuxPolicy: 'negotiate',
+            },
+          };
+
+          resetAudio("ringback");
+            setTimeout(function(e) {
+              var session = phone.call(dialTarget(getValue("num"), uriHost), options);
+              if (session) {
+
+                var myCandidateTimeout = null;
+                session.on('icecandidate', function(candidate, ready) {
+                    console.log('getting a candidate' + candidate.candidate.candidate);
+                    if (myCandidateTimeout!=null)
+                        clearTimeout(myCandidateTimeout);
+
+                    // 5 seconds timeout after the last icecandidate received!
+                    myCandidateTimeout = setTimeout(candidate.ready, 5000);
+                });
+
+
+                session.connection.addEventListener('addstream', (e) => {
+                  var audio = document.createElement('audio');
+                  audio.srcObject = e.stream;
+                  audio.play();
+                });
+              }
+            }, 2500);
+      }
+    </script>
+
+  <div class="back"><a href="/">&lt; back</a></div>
+  <div class="header">WebRTC Softphone</div>
+  <div class="subheader">Extension 1000</div>
+  <div id='pad' style='display: flex; flex-direction: column; align-items: center;'>
+    <div>
+      <input id='num' type='text' readonly>
+  </div>
+  <div style='height: 5px;'></div>
+  <div><span id='status'></span></div>
+  <div style='height: 5px;'></div>
+    <div>
+      <div><span><button onclick="appendDigit('1')" id="btn1" class="padbtn">1</button></span><span><button onclick="appendDigit('2')" id="btn2" class="padbtn">2</button></span><span><button onclick="appendDigit('3')" id="btn3" class="padbtn">3</button></span></div>
+      <div><span><button onclick="appendDigit('4')" id="btn4" class="padbtn">4</button></span><span><button onclick="appendDigit('5')" id="btn5" class="padbtn">5</button></span><span><button onclick="appendDigit('6')" id="btn6" class="padbtn">6</button></span></div>
+      <div><span><button onclick="appendDigit('7')" id="btn7" class="padbtn">7</button></span><span><button onclick="appendDigit('8')" id="btn8" class="padbtn">8</button></span><span><button onclick="appendDigit('9')" id="btn9" class="padbtn">9</button></span></div>
+      <div><span><button onclick="appendDigit('*')" id="btns" class="padbtn">*</button></span><span><button onclick="appendDigit('0')" id="btn0" class="padbtn">0</button></span><span><button onclick="appendDigit('#')" id="btnh" class="padbtn">#</button></span></div>
+
+    </div>
+    <div style='height: 5px;'></div>
+    <div>
+      <button onclick='performCall()' id='callbtn' class="padaction">CALL</button>
+      <button onclick="disconnect()" id='discbtn' class="padaction" style="display: none;">DISCONNECT</button>
+    </div>
+    <div>
+      <br><br><br><br><br>
+      <span class="instructions">ENTER - call/disconnect</span>
+    </div>
+  </div>
+
+  <script>
+    function getKey(e) {
+      if (e.keyCode==8) {
+        if (getValue("num").length>0) {
+          var v = getValue("num");
+          setValue("num", v.substring(0, v.length-1));
+        }
+      } else if ((e.keyCode>=48 && e.keyCode<=57)||(e.keyCode>=96 && e.keyCode<=105)) {
+        resetAudio("n" + e.key);
+
+        flashButton("btn" + e.key);
+        el("btn" + e.key).click();
+      }
+
+      if (e.keyCode == 13) {
+        if (el("callbtn").style.display === "none") {
+          disconnect();
+        } else {
+          performCall();
+        }
+      }
+    }
+
+    document.onkeyup = getKey;
+
+    document.querySelectorAll("*").forEach(function(node) {
+      node.addEventListener("focus", blurOnFocus);
+    });
+  </script>
+  </body>
+</html>

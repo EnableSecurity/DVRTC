@@ -1,0 +1,5 @@
+# Baresip SIP account for digest leak demo
+# INTENTIONALLY VULNERABLE: Fixed extension 2000 credentials keep the digest-leak demo reproducible
+# Extension 2000 with password 2000
+# answermode=auto makes baresip auto-answer incoming calls
+<sip:2000@127.0.0.1>;auth_pass=2000;regint=3600;outbound="sip:127.0.0.1:5060";answermode=auto

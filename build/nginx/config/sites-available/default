@@ -1,0 +1,91 @@
+# Public listener: /secret/ is blocked and served via the custom 403 page.
+server {
+	listen 80 default_server;
+	listen [::]:80 default_server;
+
+	listen 443 ssl default_server;
+	listen [::]:443 ssl default_server;
+
+	include /etc/nginx/options-ssl-nginx.conf;
+	ssl_certificate /etc/certstore/fullchain.pem; 
+	ssl_certificate_key /etc/certstore/privkey.pem;
+
+	ssl_dhparam /etc/certstore/ssl-dhparams.pem;
+
+	root /var/www/html;
+
+	# Add index.php to the list if you are using PHP
+	index index.html index.htm index.nginx-debian.html;
+
+	server_name _;
+
+	location / {
+		# First attempt to serve request as file, then
+		# as directory, then fall back to displaying a 404.
+		try_files $uri $uri/ =404;
+	}
+
+	location ^~ /call/ {
+		if ($scheme = http) {
+			return 301 https://$host$request_uri;
+		}
+		try_files $uri $uri/ =404;
+	}
+
+	location = /healthz {
+		access_log off;
+		add_header Content-Type text/plain;
+		return 200 "ok";
+	}
+
+	location = /__version {
+		access_log off;
+		default_type application/json;
+		alias /usr/share/dvrtc/version.json;
+	}
+
+	location /voicemail {
+		fancyindex on;
+		fancyindex_exact_size off;
+		add_header Link "<$scheme://$http_host$uri>; rel=\"canonical\"";
+	}
+
+	location ~ /secret/ {
+		deny all;
+		try_files $uri $uri/ =404;
+	}
+	error_page 403 /403.html;
+}
+
+# Loopback listener: used by the TURN relay exercise to reach /secret/.
+server {
+	listen 127.0.0.1:80;
+	listen [::1]:80;
+
+	root /var/www/html;
+	index index.html index.htm index.nginx-debian.html;
+
+	server_name loopback-secret;
+
+	location = /healthz {
+		access_log off;
+		add_header Content-Type text/plain;
+		return 200 "ok";
+	}
+
+	location = /__version {
+		access_log off;
+		default_type application/json;
+		alias /usr/share/dvrtc/version.json;
+	}
+
+	location /voicemail {
+		fancyindex on;
+		fancyindex_exact_size off;
+		add_header Link "<$scheme://$http_host$uri>; rel=\"canonical\"";
+	}
+
+	location ~ /secret/ {
+		try_files $uri $uri/ =404;
+	}
+}

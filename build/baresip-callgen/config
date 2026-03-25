@@ -1,0 +1,39 @@
+# Baresip configuration for call generation
+
+# Module path for Debian
+module_path		/usr/lib/baresip/modules
+
+# Audio settings - play WAV files for realistic RTP bleed demo
+audio_player		aufile,/dev/null
+audio_source		aufile,/home/baresip/sounds/current.wav
+audio_alert		aufile,/dev/null
+
+# Disable video
+video_source
+video_display
+
+# SIP settings - Use port 0 for random/ephemeral port to avoid conflicts when scaled
+sip_listen		0.0.0.0:0
+
+net_af			ipv4
+
+# Call settings
+call_local_timeout	60
+call_max_calls		5
+
+# Audio format - must match WAV files (8kHz mono)
+audio_srate		8000
+audio_channels		1
+
+# Audio codec
+audio_codecs		PCMU/8000/1,PCMA/8000/1
+
+# Module loading
+module			menu.so
+module			account.so
+module			g711.so
+module			aufile.so
+module			uuid.so
+
+# Auto answer off - we're making calls, not receiving
+auto_answer		no

@@ -1,0 +1,42 @@
+FROM debian:bookworm-slim
+
+ARG DVRTC_VERSION=dev
+ARG DVRTC_SERVICE=baresip-digestleak
+ARG VCS_REF=unknown
+
+LABEL org.opencontainers.image.title="DVRTC ${DVRTC_SERVICE}" \
+      org.opencontainers.image.version="${DVRTC_VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.source="https://github.com/enablesecurity/dvrtc"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    baresip-core \
+    netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /usr/share/dvrtc && cat > /usr/share/dvrtc/version.json <<EOF
+{
+  "product": "dvrtc",
+  "service": "${DVRTC_SERVICE}",
+  "version": "${DVRTC_VERSION}",
+  "revision": "${VCS_REF}"
+}
+EOF
+
+# Create baresip user
+RUN useradd -u 15011 -m baresip
+
+USER baresip
+WORKDIR /home/baresip
+
+# Create .baresip directory for config
+RUN mkdir -p /home/baresip/.baresip
+
+# Copy configuration files
+COPY --chown=baresip:baresip config /home/baresip/.baresip/config
+COPY --chown=baresip:baresip accounts /home/baresip/.baresip/accounts
+
+# Copy startup script
+COPY --chown=baresip:baresip run.sh /home/baresip/run.sh
+
+CMD ["/bin/sh", "/home/baresip/run.sh"]

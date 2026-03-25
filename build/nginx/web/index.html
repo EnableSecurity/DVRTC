@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+    <title>DVRTC - Damn Vulnerable Real-Time Communications</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <link rel='icon' href='/favicon.ico' type='image/x-icon'>
+    <style>
+        @import url('call/css/pressstart.css');
+        body {
+            background: #00000c;
+            color: #B0FDFF;
+            font-family: 'Press Start 2P', monospace;
+            margin: 0;
+            padding: 40px 20px;
+            min-height: 100vh;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            text-transform: uppercase;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 20px;
+            text-shadow: 0 0 26px #7ebdbe;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        .subtitle {
+            font-size: 11px;
+            color: #5d9293;
+            margin-bottom: 40px;
+            line-height: 1.8;
+        }
+        .warning {
+            border: 1pt solid #ff4444;
+            padding: 15px;
+            margin-bottom: 40px;
+            font-size: 10px;
+            line-height: 1.8;
+            color: #ff6666;
+            text-shadow: 0 0 10px #ff4444;
+        }
+        .warning strong {
+            color: #ff4444;
+        }
+        .nav-list {
+            list-style: none;
+            padding: 0;
+        }
+        .nav-list li {
+            margin-bottom: 20px;
+        }
+        .nav-list a {
+            color: #B0FDFF;
+            text-decoration: none;
+            font-size: 12px;
+            text-shadow: 0 0 14px #5d9293;
+            transition: text-shadow 0.2s;
+        }
+        .nav-list a:hover {
+            text-shadow: 0 0 30px #B0FDFF;
+            color: #ffffff;
+        }
+        .nav-list li .nav-cursor {
+            display: inline-block;
+            width: 24px;
+            color: #5d9293;
+        }
+        .nav-list li.selected a {
+            text-shadow: 0 0 30px #B0FDFF;
+            color: #ffffff;
+        }
+        .nav-desc {
+            font-size: 9px;
+            color: #5d9293;
+            margin-top: 5px;
+            margin-left: 24px;
+            line-height: 1.6;
+            text-transform: none;
+        }
+        .instructions {
+            margin-top: 40px;
+            font-size: 9px;
+            color: #808080;
+            line-height: 1.8;
+        }
+        .footer {
+            margin-top: 60px;
+            font-size: 9px;
+            color: #5d9293;
+            line-height: 1.8;
+        }
+        .footer a {
+            color: #7ebdbe;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            color: #B0FDFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>DVRTC</h1>
+        <div class="subtitle">Damn Vulnerable Real-Time Communications</div>
+
+        <div class="warning">
+            <strong>Warning:</strong> This system contains intentional security vulnerabilities for educational purposes. Deploy only on dedicated hosts with no production systems or sensitive data.
+        </div>
+
+        <ul class="nav-list">
+            <li>
+                <span class="nav-cursor"></span><a href="#" id="call-link">Perform a call</a>
+                <div class="nav-desc">WebRTC softphone - use the HTTPS version so browser microphone access works</div>
+            </li>
+            <li>
+                <span class="nav-cursor"></span><a href="logs/">SIP user-agent logs</a>
+                <div class="nav-desc">View logged user-agent headers from SIP requests</div>
+            </li>
+            <li>
+                <span class="nav-cursor"></span><a href="secret/">Top secret area</a>
+                <div class="nav-desc">Authorized personnel only</div>
+            </li>
+        </ul>
+
+        <div class="instructions">Arrow keys - navigate, Enter - select</div>
+
+        <div class="footer">
+            <a href="https://github.com/EnableSecurity/DVRTC">Documentation and exercises on GitHub</a>
+        </div>
+    </div>
+<script>
+    var items = document.querySelectorAll('.nav-list li');
+    var cursors = document.querySelectorAll('.nav-cursor');
+    var selector = 0;
+
+    function refresh() {
+        for (var i = 0; i < items.length; i++) {
+            items[i].className = (i === selector) ? 'selected' : '';
+            cursors[i].textContent = (i === selector) ? '> ' : '';
+        }
+    }
+
+    document.onkeydown = function(e) {
+        if (e.keyCode === 38 || e.keyCode === 40) {
+            e.preventDefault();
+        }
+    };
+
+    document.onkeyup = function(e) {
+        if (e.keyCode === 38) {
+            e.preventDefault();
+            if (selector > 0) selector--;
+            refresh();
+        }
+        if (e.keyCode === 40) {
+            e.preventDefault();
+            if (selector < items.length - 1) selector++;
+            refresh();
+        }
+        if (e.keyCode === 13) {
+            items[selector].querySelector('a').click();
+        }
+    };
+
+    (function() {
+        var callLink = document.getElementById('call-link');
+        var host = window.location.hostname;
+        if (host.indexOf(':') !== -1 && host.indexOf('[') === -1) {
+            host = '[' + host + ']';
+        }
+        callLink.href = 'https://' + host + '/call/';
+    })();
+
+    refresh();
+</script>
+</body>
+</html>

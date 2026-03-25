@@ -1,0 +1,119 @@
+# Local development overrides for maintainers who need to rebuild images.
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml build
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+services:
+  asterisk:
+    build:
+      context: build/asterisk
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: asterisk
+        VCS_REF: ${VCS_REF:-unknown}
+
+  rtpengine:
+    build:
+      context: build/rtpengine
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: rtpengine
+        VCS_REF: ${VCS_REF:-unknown}
+        RTPENGINE_VERSION: mr10.5.5.1
+
+  kamailio:
+    build:
+      context: build/kamailio
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: kamailio
+        VCS_REF: ${VCS_REF:-unknown}
+        KAMAILIO_VERSION: 61
+
+  baresip-callgen:
+    build:
+      context: build/baresip-callgen
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: baresip-callgen
+        VCS_REF: ${VCS_REF:-unknown}
+
+  baresip-callgen-b:
+    build:
+      context: build/baresip-callgen
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: baresip-callgen
+        VCS_REF: ${VCS_REF:-unknown}
+
+  baresip-callgen-c:
+    build:
+      context: build/baresip-callgen
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: baresip-callgen
+        VCS_REF: ${VCS_REF:-unknown}
+
+  baresip-digestleak:
+    build:
+      context: build/baresip-digestleak
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: baresip-digestleak
+        VCS_REF: ${VCS_REF:-unknown}
+
+  nginx:
+    build:
+      context: build/nginx
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: nginx
+        VCS_REF: ${VCS_REF:-unknown}
+
+  voicemailcleaner:
+    build:
+      context: build/voicemailcleaner
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: voicemailcleaner
+        VCS_REF: ${VCS_REF:-unknown}
+
+  mysqlclient:
+    build:
+      context: build/mysqlclient
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: mysqlclient
+        VCS_REF: ${VCS_REF:-unknown}
+
+  dbcleaner:
+    build:
+      context: build/dbcleaner
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: dbcleaner
+        VCS_REF: ${VCS_REF:-unknown}
+
+  db:
+    build:
+      context: build/mysql
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: db
+        VCS_REF: ${VCS_REF:-unknown}
+
+  testing:
+    build:
+      context: build/testing
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: testing
+        VCS_REF: ${VCS_REF:-unknown}
+
+  attacker:
+    build:
+      context: build/testing
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: testing
+        VCS_REF: ${VCS_REF:-unknown}

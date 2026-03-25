@@ -1,0 +1,121 @@
+# Colima Bridged Networking Setup on macOS
+
+This guide sets up Colima with bridged networking so the VM gets a real IP on your current network, enabling `--network host` to work properly with Docker containers.
+Direct Docker Desktop deployment on macOS is not the supported path for DVRTC because the stack depends on host networking semantics.
+
+## Prerequisites
+
+- macOS with Homebrew installed
+- Docker CLI and Compose plugin installed (`brew install docker docker-compose`)
+- Colima installed (`brew install colima`)
+
+## Step 1: Configure Lima vmnet using the official docs
+
+Follow Lima's official vmnet setup guide:
+
+- <https://lima-vm.io/docs/config/network/vmnet/>
+
+For DVRTC, use Lima's managed vmnet flow for bridged networking. That setup includes:
+
+- installing `socket_vmnet` in a root-owned, non-symlink path
+- configuring `~/.lima/_config/networks.yaml`
+- installing the Lima sudoers entry
+- creating `/private/var/run/lima`
+
+Do not use a separate `brew services` `socket_vmnet` launchd service for this workflow. Lima starts the managed daemon automatically when a VM using that network starts.
+
+## Step 2: Start Colima with bridged networking
+
+If you have an existing Colima instance, delete it first (network mode can't be changed after creation):
+
+```bash
+colima stop
+colima delete --force
+```
+
+Start with bridged networking and sufficient resources for DVRTC:
+
+```bash
+colima start --network-address --network-mode bridged --vm-type vz --mount-type virtiofs --cpu 4 --memory 8
+```
+
+The default 2 CPU / 2 GB Colima allocation is usually too small for the full DVRTC stack. `--cpu 4 --memory 8` is a better starting point for the current compose setup. Increase it if local builds, packet capture, or the full testing workflow are slow.
+
+On Apple Silicon, add `--vz-rosetta` if you also want x86_64 user-space translation available inside the VM for local development workflows.
+
+### Changing resources on an existing instance
+
+CPU and memory can be changed without recreating the VM:
+
+```bash
+colima stop
+colima start --cpu 4 --memory 8
+```
+
+Verify the current allocation:
+
+```bash
+colima list
+```
+
+## Step 3: Set the bridged IPs
+
+The `setup_networking.sh` script auto-detects the Colima VM's bridged IPv4 and, when the VM has a usable global or ULA address, its IPv6 too:
+
+```bash
+./scripts/setup_networking.sh
+```
+
+To verify the IPs manually:
+
+```bash
+colima ssh -- ip addr show
+colima ssh -- ip -6 addr show scope global
+```
+
+Look for the bridged interface that Colima created. It should have an IPv4 address on your LAN subnet (for example `192.168.x.x`). If your network provides IPv6, it should also have a usable global or ULA IPv6 address. If no usable IPv6 address is present, leave `PUBLIC_IPV6` unset and DVRTC stays IPv4-only.
+
+## Optional: Add custom CA certificate
+
+If you have a private registry with a custom CA:
+
+```bash
+cat /path/to/your-ca.crt | colima ssh -- sudo tee /usr/local/share/ca-certificates/your-ca.crt > /dev/null
+colima ssh -- sudo update-ca-certificates
+```
+
+## Usage
+
+Once Colima is up with bridged networking, use the normal DVRTC setup flow from your host shell:
+
+```bash
+./scripts/setup_networking.sh
+./scripts/generate_passwords.sh
+./scripts/init-selfsigned.sh
+./scripts/validate_env.sh
+docker compose up -d
+docker compose ps
+```
+
+For host-side access checks from macOS, use the bridged `PUBLIC_IPV4` written to `.env`, not `127.0.0.1`:
+
+```bash
+. ./.env
+curl "http://${PUBLIC_IPV4}/"
+```
+
+If you want to test loopback inside the Colima VM itself, use:
+
+```bash
+colima ssh -- curl http://127.0.0.1/
+```
+
+If you rebuild images locally on Apple Silicon, follow [development.md](development.md) and keep the `linux/amd64` build requirement in mind.
+
+## Notes
+
+- The bridged IP is assigned via DHCP, so it may change across restarts
+- IPv6 availability depends on your LAN/router. Bridged Colima does not invent IPv6; it can only use an address actually assigned to the VM
+- Bridged means the VM is directly on your current network; if that network is private/NAT'd, inbound access from the public internet still requires port forwarding or a public IP
+- The CA certificate and other VM customizations won't survive `colima delete` - you'll need to re-add them
+- Consider setting a static DHCP lease on your router for a consistent IP
