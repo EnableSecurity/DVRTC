@@ -33,23 +33,35 @@ colima stop
 colima delete --force
 ```
 
-Start with bridged networking and sufficient resources for DVRTC:
+Official Colima guidance keeps `shared` networking as the default and recommended mode. DVRTC is a repo-specific exception: use `bridged` here because the stack needs a VM address that is reachable as a real host on your LAN, so Docker `--network host` inside the VM behaves in a way that matches the documented DVRTC workflow.
+
+Start Colima with bridged networking and enough resources for a full DVRTC stack:
 
 ```bash
-colima start --network-address --network-mode bridged --vm-type vz --mount-type virtiofs --cpu 4 --memory 8
+colima start --network-address --network-mode bridged --vm-type vz --cpu 8 --memory 16 --disk 200
 ```
 
-The default 2 CPU / 2 GB Colima allocation is usually too small for the full DVRTC stack. `--cpu 4 --memory 8` is a better starting point for the current compose setup. Increase it if local builds, packet capture, or the full testing workflow are slow.
+The default 2 CPU / 2 GB Colima allocation is too small for the full DVRTC stack. In practice, `--cpu 8 --memory 16 --disk 200` has been a more reliable DVRTC baseline for local builds, packet capture, and the full testing workflow. These values are not general Colima requirements; they are a tested starting point for this repository.
 
-On Apple Silicon, add `--vz-rosetta` if you also want x86_64 user-space translation available inside the VM for local development workflows.
+The command above does not pass `--mount-type virtiofs` because current Colima releases already default VZ instances to `virtiofs`.
+
+On Apple Silicon, include `--vz-rosetta`:
+
+```bash
+colima start --network-address --network-mode bridged --vm-type vz --cpu 8 --memory 16 --disk 200 --vz-rosetta
+```
+
+Rosetta support is required for this setup to work reliably with DVRTC's `linux/amd64` image and build requirements on Apple Silicon.
+
+If you prefer persistent config instead of passing CLI flags each time, run `colima start --edit` and set the same values in the profile. On Apple Silicon, make sure `rosetta: true` is set in `~/.colima/default/colima.yaml` before starting the VM.
 
 ### Changing resources on an existing instance
 
-CPU and memory can be changed without recreating the VM:
+If you need to change the resource settings later, stop Colima and start it again with the updated values:
 
 ```bash
 colima stop
-colima start --cpu 4 --memory 8
+colima start --cpu 8 --memory 16 --disk 200
 ```
 
 Verify the current allocation:

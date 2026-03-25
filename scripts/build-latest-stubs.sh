@@ -7,6 +7,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 IMAGE_PREFIX="ghcr.io/enablesecurity/dvrtc"
 PUSH=0
+DEFAULT_SOURCE_URL="https://github.com/EnableSecurity/DVRTC"
 
 usage() {
     cat <<'EOF'
@@ -49,6 +50,7 @@ done
 
 VERSION="$(tr -d '\n' < "$REPO_ROOT/VERSION")"
 VCS_REF="$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD)"
+DVRTC_SOURCE="${DVRTC_SOURCE:-$DEFAULT_SOURCE_URL}"
 SERVICES="asterisk rtpengine kamailio baresip-callgen baresip-digestleak nginx voicemailcleaner mysqlclient dbcleaner db testing"
 TMP_COMPOSE="$(mktemp "${TMPDIR:-/tmp}/dvrtc-latest-stubs.XXXXXX.yml")"
 
@@ -73,6 +75,7 @@ for SERVICE in $SERVICES; do
         DVRTC_VERSION: ${VERSION}
         DVRTC_SERVICE: ${SERVICE}
         VCS_REF: ${VCS_REF}
+        DVRTC_SOURCE: ${DVRTC_SOURCE}
         TARGET_IMAGE: ${TARGET_IMAGE}
 EOF
 done

@@ -1,14 +1,5 @@
 FROM debian:sid-slim
 
-ARG DVRTC_VERSION=dev
-ARG DVRTC_SERVICE=asterisk
-ARG VCS_REF=unknown
-
-LABEL org.opencontainers.image.title="DVRTC ${DVRTC_SERVICE}" \
-      org.opencontainers.image.version="${DVRTC_VERSION}" \
-      org.opencontainers.image.revision="${VCS_REF}" \
-      org.opencontainers.image.source="https://github.com/enablesecurity/dvrtc"
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
     asterisk \
     asterisk-modules \
@@ -16,15 +7,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     asterisk-moh-opsound-wav \
     libopus0 \
     && rm -rf /var/lib/apt/lists/*
-
-RUN mkdir -p /usr/share/dvrtc && cat > /usr/share/dvrtc/version.json <<EOF
-{
-  "product": "dvrtc",
-  "service": "${DVRTC_SERVICE}",
-  "version": "${DVRTC_VERSION}",
-  "revision": "${VCS_REF}"
-}
-EOF
 
 # Create asterisk user with UID 100 (must match voicemailcleaner)
 # May already exist from package, so ignore failures
@@ -41,5 +23,24 @@ COPY --chmod=755 healthcheck/healthcheck.sh /usr/local/bin/asterisk-healthcheck
 WORKDIR /opt/run/asterisk
 
 COPY run.sh run.sh
+
+ARG DVRTC_VERSION=dev
+ARG DVRTC_SERVICE=asterisk
+ARG VCS_REF=unknown
+ARG DVRTC_SOURCE=https://github.com/EnableSecurity/DVRTC
+
+LABEL org.opencontainers.image.title="DVRTC ${DVRTC_SERVICE}" \
+      org.opencontainers.image.version="${DVRTC_VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.source="${DVRTC_SOURCE}"
+
+RUN mkdir -p /usr/share/dvrtc && cat > /usr/share/dvrtc/version.json <<EOF
+{
+  "product": "dvrtc",
+  "service": "${DVRTC_SERVICE}",
+  "version": "${DVRTC_VERSION}",
+  "revision": "${VCS_REF}"
+}
+EOF
 
 CMD ["./run.sh"]

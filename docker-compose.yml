@@ -24,7 +24,7 @@ services:
   # Asterisk PBX - Backend call processing
   # INTENTIONALLY VULNERABLE: Weak passwords (1000:1500), no rate limiting, RTP vulnerabilities
   asterisk:
-    image: ghcr.io/enablesecurity/dvrtc/asterisk:v0.1.2
+    image: ghcr.io/enablesecurity/dvrtc/asterisk:v0.1.3
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -49,7 +49,7 @@ services:
   # RTPEngine - Media proxy for RTP/SRTP
   # INTENTIONALLY VULNERABLE: Configured to allow RTP bleed and injection attacks
   rtpengine:
-    image: ghcr.io/enablesecurity/dvrtc/rtpengine:v0.1.2
+    image: ghcr.io/enablesecurity/dvrtc/rtpengine:v0.1.3
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -67,7 +67,7 @@ services:
   # Kamailio - SIP proxy/registrar (front-end)
   # INTENTIONALLY VULNERABLE: Returns detailed responses enabling enumeration, extension 2000 digest leak
   kamailio:
-    image: ghcr.io/enablesecurity/dvrtc/kamailio:v0.1.2
+    image: ghcr.io/enablesecurity/dvrtc/kamailio:v0.1.3
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -103,7 +103,7 @@ services:
   # Three staggered callers keep extension 1300 busy for RTP bleed demos
   # without the CPU cost of the previous 40-replica fanout.
   baresip-callgen:
-    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.1.2
+    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.1.3
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -123,7 +123,7 @@ services:
         restart: true
 
   baresip-callgen-b:
-    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.1.2
+    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.1.3
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -143,7 +143,7 @@ services:
         restart: true
 
   baresip-callgen-c:
-    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.1.2
+    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.1.3
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -165,7 +165,7 @@ services:
   # Baresip Digest Leak - Registers extension 2000 for digest leak demonstration
   # Auto-answers calls and immediately hangs up to trigger authentication challenges
   baresip-digestleak:
-    image: ghcr.io/enablesecurity/dvrtc/baresip-digestleak:v0.1.2
+    image: ghcr.io/enablesecurity/dvrtc/baresip-digestleak:v0.1.3
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -178,7 +178,7 @@ services:
   # Nginx - Web server
   # INTENTIONALLY VULNERABLE: Exposes voicemail directory listing and user-agent logs
   nginx:
-    image: ghcr.io/enablesecurity/dvrtc/nginx:v0.1.2
+    image: ghcr.io/enablesecurity/dvrtc/nginx:v0.1.3
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -210,7 +210,7 @@ services:
 
   # Voicemail Cleaner - Prevents disk exhaustion from testing
   voicemailcleaner:
-    image: ghcr.io/enablesecurity/dvrtc/voicemailcleaner:v0.1.2
+    image: ghcr.io/enablesecurity/dvrtc/voicemailcleaner:v0.1.3
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -303,7 +303,7 @@ services:
 
   # MySQL Client - Exports user-agent statistics to JSON
   mysqlclient:
-    image: ghcr.io/enablesecurity/dvrtc/mysqlclient:v0.1.2
+    image: ghcr.io/enablesecurity/dvrtc/mysqlclient:v0.1.3
     platform: linux/amd64
     volumes:
     - type: volume
@@ -320,7 +320,7 @@ services:
 
   # Database Cleaner - Truncates user-agent table hourly
   dbcleaner:
-    image: ghcr.io/enablesecurity/dvrtc/dbcleaner:v0.1.2
+    image: ghcr.io/enablesecurity/dvrtc/dbcleaner:v0.1.3
     platform: linux/amd64
     network_mode: "host"  # Requires MySQL access
     environment:
@@ -334,7 +334,7 @@ services:
   # MySQL Database
   # INTENTIONALLY VULNERABLE: Exposed on non-standard port with hardcoded password (kamailiorw)
   db:
-    image: ghcr.io/enablesecurity/dvrtc/db:v0.1.2
+    image: ghcr.io/enablesecurity/dvrtc/db:v0.1.3
     platform: linux/amd64
     network_mode: "host"  # Host networking for compatibility with other host-networked services
     environment:
@@ -357,7 +357,7 @@ services:
   # Use with: docker compose run --rm testing ...
   # Not part of the normal long-lived stack started by docker compose up -d
   testing:
-    image: ghcr.io/enablesecurity/dvrtc/testing:v0.1.2
+    image: ghcr.io/enablesecurity/dvrtc/testing:v0.1.3
     platform: linux/amd64
     network_mode: "host"
     privileged: true
@@ -375,7 +375,7 @@ services:
   # Use with: docker compose run --rm attacker ...
   # Not part of the normal long-lived stack started by docker compose up -d
   attacker:
-    image: ghcr.io/enablesecurity/dvrtc/testing:v0.1.2
+    image: ghcr.io/enablesecurity/dvrtc/testing:v0.1.3
     platform: linux/amd64
     environment:
       PUBLIC_IPV4: "${PUBLIC_IPV4:-}"

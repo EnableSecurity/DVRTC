@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 PUSH=0
+DEFAULT_SOURCE_URL="https://github.com/EnableSecurity/DVRTC"
 
 usage() {
     cat <<'EOF'
@@ -45,6 +46,7 @@ TESTING_SERVICE="testing"
 
 export DVRTC_VERSION="$VERSION"
 export VCS_REF="$VCS_REF"
+export DVRTC_SOURCE="${DVRTC_SOURCE:-$DEFAULT_SOURCE_URL}"
 
 echo "Building release images for ${VERSION}"
 docker compose -f "$COMPOSE_FILE" -f "$DEV_COMPOSE_FILE" build $SERVICES

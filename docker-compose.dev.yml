@@ -11,6 +11,7 @@ services:
         DVRTC_VERSION: ${DVRTC_VERSION:-dev}
         DVRTC_SERVICE: asterisk
         VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
 
   rtpengine:
     build:
@@ -19,6 +20,7 @@ services:
         DVRTC_VERSION: ${DVRTC_VERSION:-dev}
         DVRTC_SERVICE: rtpengine
         VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
         RTPENGINE_VERSION: mr10.5.5.1
 
   kamailio:
@@ -28,6 +30,7 @@ services:
         DVRTC_VERSION: ${DVRTC_VERSION:-dev}
         DVRTC_SERVICE: kamailio
         VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
         KAMAILIO_VERSION: 61
 
   baresip-callgen:
@@ -37,6 +40,7 @@ services:
         DVRTC_VERSION: ${DVRTC_VERSION:-dev}
         DVRTC_SERVICE: baresip-callgen
         VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
 
   baresip-callgen-b:
     build:
@@ -45,6 +49,7 @@ services:
         DVRTC_VERSION: ${DVRTC_VERSION:-dev}
         DVRTC_SERVICE: baresip-callgen
         VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
 
   baresip-callgen-c:
     build:
@@ -53,6 +58,7 @@ services:
         DVRTC_VERSION: ${DVRTC_VERSION:-dev}
         DVRTC_SERVICE: baresip-callgen
         VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
 
   baresip-digestleak:
     build:
@@ -61,6 +67,7 @@ services:
         DVRTC_VERSION: ${DVRTC_VERSION:-dev}
         DVRTC_SERVICE: baresip-digestleak
         VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
 
   nginx:
     build:
@@ -69,6 +76,7 @@ services:
         DVRTC_VERSION: ${DVRTC_VERSION:-dev}
         DVRTC_SERVICE: nginx
         VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
 
   voicemailcleaner:
     build:
@@ -77,6 +85,7 @@ services:
         DVRTC_VERSION: ${DVRTC_VERSION:-dev}
         DVRTC_SERVICE: voicemailcleaner
         VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
 
   mysqlclient:
     build:
@@ -85,6 +94,7 @@ services:
         DVRTC_VERSION: ${DVRTC_VERSION:-dev}
         DVRTC_SERVICE: mysqlclient
         VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
 
   dbcleaner:
     build:
@@ -93,6 +103,7 @@ services:
         DVRTC_VERSION: ${DVRTC_VERSION:-dev}
         DVRTC_SERVICE: dbcleaner
         VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
 
   db:
     build:
@@ -101,6 +112,7 @@ services:
         DVRTC_VERSION: ${DVRTC_VERSION:-dev}
         DVRTC_SERVICE: db
         VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
 
   testing:
     build:
@@ -109,6 +121,7 @@ services:
         DVRTC_VERSION: ${DVRTC_VERSION:-dev}
         DVRTC_SERVICE: testing
         VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
 
   attacker:
     build:
@@ -117,3 +130,4 @@ services:
         DVRTC_VERSION: ${DVRTC_VERSION:-dev}
         DVRTC_SERVICE: testing
         VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}

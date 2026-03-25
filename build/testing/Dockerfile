@@ -16,14 +16,16 @@ RUN apt-get update \
 
 # JtR does not expose a documented per-format configure flag such as
 # --enable-formats=sip, so build a lean SIP-capable binary by disabling
-# unrelated subsystems we do not use in the testing image.
+# unrelated subsystems we do not use in the testing image. Force x86-64's
+# SSE2 baseline instead of auto-detecting AVX2 on the build host so the
+# resulting binary runs on older or more constrained CPUs.
 RUN git init /tmp/john \
     && cd /tmp/john \
     && git remote add origin https://github.com/openwall/john.git \
     && git fetch --depth 1 origin "${JOHN_REF}" \
     && git checkout --detach FETCH_HEAD \
     && cd /tmp/john/src \
-    && ./configure --without-openssl --disable-opencl --disable-pcap \
+    && ./configure --without-openssl --disable-opencl --disable-pcap --enable-simd=sse2 \
     && make -s clean \
     && make -s -j"$(nproc)" \
     && mkdir -p /opt/john \
@@ -36,18 +38,9 @@ RUN git init /tmp/john \
 FROM python:3.11-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
-
-ARG DVRTC_VERSION=dev
-ARG DVRTC_SERVICE=testing
-ARG VCS_REF=unknown
 ARG SIPVICIOUS_VERSION=0.3.5
 ARG SCAPY_VERSION=2.7.0
 ARG WEBSOCKETS_VERSION=16.0
-
-LABEL org.opencontainers.image.title="DVRTC ${DVRTC_SERVICE}" \
-      org.opencontainers.image.version="${DVRTC_VERSION}" \
-      org.opencontainers.image.revision="${VCS_REF}" \
-      org.opencontainers.image.source="https://github.com/enablesecurity/dvrtc"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -67,15 +60,6 @@ RUN apt-get update \
         wget \
         gnupg \
     && rm -rf /var/lib/apt/lists/*
-
-RUN mkdir -p /usr/share/dvrtc && cat > /usr/share/dvrtc/version.json <<EOF
-{
-  "product": "dvrtc",
-  "service": "${DVRTC_SERVICE}",
-  "version": "${DVRTC_VERSION}",
-  "revision": "${VCS_REF}"
-}
-EOF
 
 # Add Kamailio repository for kamcmd (BINRPC client) and install baresip
 RUN wget -qO- https://deb.kamailio.org/kamailiodebkey.gpg | gpg --dearmor -o /usr/share/keyrings/kamailio.gpg \
@@ -124,5 +108,24 @@ RUN john --list=formats 2>/dev/null | grep -q "SIP" \
     && command -v baresip \
     && python3 -c "import scapy" \
     && python3 -c "import websockets"
+
+ARG DVRTC_VERSION=dev
+ARG DVRTC_SERVICE=testing
+ARG VCS_REF=unknown
+ARG DVRTC_SOURCE=https://github.com/EnableSecurity/DVRTC
+
+LABEL org.opencontainers.image.title="DVRTC ${DVRTC_SERVICE}" \
+      org.opencontainers.image.version="${DVRTC_VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.source="${DVRTC_SOURCE}"
+
+RUN mkdir -p /usr/share/dvrtc && cat > /usr/share/dvrtc/version.json <<EOF
+{
+  "product": "dvrtc",
+  "service": "${DVRTC_SERVICE}",
+  "version": "${DVRTC_VERSION}",
+  "revision": "${VCS_REF}"
+}
+EOF
 
 CMD ["sh"]

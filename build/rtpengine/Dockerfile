@@ -1,32 +1,14 @@
 FROM debian:bookworm-slim
-
-ARG DVRTC_VERSION=dev
-ARG DVRTC_SERVICE=rtpengine
-ARG VCS_REF=unknown
 ARG RTPENGINE_VERSION=mr10.5.5.1
 ARG RTPENGINE_REPO_REL=10.5
 ARG RTPENGINE_KEYRING_DEB=rtpengine-dfx-repo-keyring_1.0_all.deb
 ARG RTPENGINE_KEYRING_SHA256=78fe26f0251138f4e3c749c88dc4df29666c8efe0823858d3a4ab49d2fa2e088
-
-LABEL org.opencontainers.image.title="DVRTC ${DVRTC_SERVICE}" \
-      org.opencontainers.image.version="${DVRTC_VERSION}" \
-      org.opencontainers.image.revision="${VCS_REF}" \
-      org.opencontainers.image.source="https://github.com/enablesecurity/dvrtc"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     ca-certificates \
     dpkg \
     && rm -rf /var/lib/apt/lists/*
-
-RUN mkdir -p /usr/share/dvrtc && cat > /usr/share/dvrtc/version.json <<EOF
-{
-  "product": "dvrtc",
-  "service": "${DVRTC_SERVICE}",
-  "version": "${DVRTC_VERSION}",
-  "revision": "${VCS_REF}"
-}
-EOF
 
 # Install the upstream repo keyring, verify its published checksum, and use
 # the repository with apt signature verification enabled.
@@ -49,11 +31,29 @@ RUN useradd -u 15004 rtpengine || true
 RUN mkdir -p /opt/run/rtpengine /var/log/rtpengine && chown -R rtpengine /opt/run/rtpengine /var/log/rtpengine
 
 COPY --chmod=755 healthcheck/healthcheck.sh /usr/local/bin/rtpengine-healthcheck
+COPY --chmod=755 --chown=rtpengine:rtpengine run.sh /opt/run/rtpengine/run.sh
+
+ARG DVRTC_VERSION=dev
+ARG DVRTC_SERVICE=rtpengine
+ARG VCS_REF=unknown
+ARG DVRTC_SOURCE=https://github.com/EnableSecurity/DVRTC
+
+LABEL org.opencontainers.image.title="DVRTC ${DVRTC_SERVICE}" \
+      org.opencontainers.image.version="${DVRTC_VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.source="${DVRTC_SOURCE}"
+
+RUN mkdir -p /usr/share/dvrtc && cat > /usr/share/dvrtc/version.json <<EOF
+{
+  "product": "dvrtc",
+  "service": "${DVRTC_SERVICE}",
+  "version": "${DVRTC_VERSION}",
+  "revision": "${VCS_REF}"
+}
+EOF
 
 USER rtpengine
 
 WORKDIR /opt/run/rtpengine
-
-COPY --chmod=755 --chown=rtpengine:rtpengine run.sh run.sh
 
 CMD ["./run.sh"]
