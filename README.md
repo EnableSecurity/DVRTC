@@ -23,13 +23,13 @@ The current repository ships one active scenario: `pbx1`.
 
 A live deployment of the `pbx1` scenario is currently available at `pbx1.dvrtc.net`. Verify it is reachable before relying on it. See the [pbx1 Scenario Overview](docs/pbx1/overview.md) for the public endpoints and usage notes.
 
-![pbx1 public deployment screenshot](docs/assets/pbx1-homepage.png)
-
 Start here for scenario-specific details:
 
 - [pbx1 Scenario Overview](docs/pbx1/overview.md)
 - [pbx1 Exercise Index](docs/pbx1/exercises/README.md)
 - [pbx1 Architecture](docs/pbx1/architecture.md)
+
+![pbx1 public deployment screenshot](docs/assets/pbx1-homepage.png)
 
 ## Quick Start
 
@@ -51,6 +51,8 @@ If you are on macOS, use the Colima workflow in [docs/colima-setup.md](docs/coli
 ./scripts/validate_env.sh
 docker compose up -d
 ```
+
+Once the stack is up, you're ready to jump into the hands-on exercises in the [pbx1 Exercise Index](docs/pbx1/exercises/README.md).
 
 If you want publicly trusted certificates instead of self-signed lab certs, set `DOMAIN` and `EMAIL` in `.env` and use `./scripts/init-letsencrypt.sh` instead.
 

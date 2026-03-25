@@ -50,11 +50,20 @@ server {
 		add_header Link "<$scheme://$http_host$uri>; rel=\"canonical\"";
 	}
 
+	location = /secret/ {
+		error_page 418 =403 /403.html;
+		if ($http_accept ~* "text/html") {
+			return 418;
+		}
+		default_type text/plain;
+		return 403 "You shall not pass!\n";
+	}
+
 	location ~ /secret/ {
+		error_page 403 /403.html;
 		deny all;
 		try_files $uri $uri/ =404;
 	}
-	error_page 403 /403.html;
 }
 
 # Loopback listener: used by the TURN relay exercise to reach /secret/.
@@ -83,6 +92,14 @@ server {
 		fancyindex on;
 		fancyindex_exact_size off;
 		add_header Link "<$scheme://$http_host$uri>; rel=\"canonical\"";
+	}
+
+	location = /secret/ {
+		if ($http_accept ~* "text/html") {
+			rewrite ^ /secret/index.html last;
+		}
+		default_type text/plain;
+		return 200 "You have now safely shutdown the Internet.\n";
 	}
 
 	location ~ /secret/ {
