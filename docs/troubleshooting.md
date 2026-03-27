@@ -216,7 +216,8 @@ docker compose logs nginx
 Platform note:
 
 - on a native Linux Docker host, `curl http://127.0.0.1/` is also a useful local-bind check
-- on macOS with Colima or any other Linux VM workflow, host-side checks should use the bridged `PUBLIC_IPV4` from `.env`, not `127.0.0.1`
+- on macOS with Colima or any other Linux VM workflow, prefer the bridged `PUBLIC_IPV4` from `.env` for host-side checks because it matches the VM's real advertised service identity
+- on current Colima releases, `127.0.0.1` on macOS may also reach forwarded services, but that is a convenience path rather than the canonical address for the stack
 - if you specifically want to test loopback inside a Colima VM, run `colima ssh -- curl http://127.0.0.1/`
 
 For HTTPS with self-signed certificates:

@@ -1,6 +1,6 @@
 # Colima Bridged Networking Setup on macOS
 
-This guide sets up Colima with bridged networking so the VM gets a real IP on your current network, enabling `--network host` to work properly with Docker containers.
+This guide sets up Colima with bridged networking so the VM gets a real IP on your current network. For DVRTC, treat the Colima VM as the effective Linux host: containers using `--network host` share the VM network namespace, not the macOS host's network identity.
 Direct Docker Desktop deployment on macOS is not the supported path for DVRTC because the stack depends on host networking semantics.
 
 ## Prerequisites
@@ -33,7 +33,7 @@ colima stop
 colima delete --force
 ```
 
-Official Colima guidance keeps `shared` networking as the default and recommended mode. DVRTC is a repo-specific exception: use `bridged` here because the stack needs a VM address that is reachable as a real host on your LAN, so Docker `--network host` inside the VM behaves in a way that matches the documented DVRTC workflow.
+Official Colima guidance keeps `shared` networking as the default and recommended mode. DVRTC is a repo-specific exception: use `bridged` here because the stack needs a VM address that is reachable as a real host on your LAN, and components such as Kamailio, RTPEngine, and coturn need explicit addresses to advertise. Colima may also mirror forwarded ports onto macOS, but that host-side forwarding is a convenience layer, not the canonical service identity for the stack.
 
 Start Colima with bridged networking and enough resources for a full DVRTC stack:
 
@@ -109,14 +109,16 @@ docker compose up -d
 docker compose ps
 ```
 
-For host-side access checks from macOS, use the bridged `PUBLIC_IPV4` written to `.env`, not `127.0.0.1`:
+For host-side access checks from macOS, prefer the bridged `PUBLIC_IPV4` written to `.env`:
 
 ```bash
 . ./.env
 curl "http://${PUBLIC_IPV4}/"
 ```
 
-If you want to test loopback inside the Colima VM itself, use:
+Current Colima releases may also make the stack reachable on macOS `127.0.0.1` or the macOS host IP via automatic port forwarding. Treat that as a host-side convenience, not the address DVRTC components should advertise or the main mental model for the deployment.
+
+If you specifically want to test loopback inside the Colima VM's own network namespace, use:
 
 ```bash
 colima ssh -- curl http://127.0.0.1/

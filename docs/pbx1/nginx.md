@@ -39,7 +39,7 @@ curl "http://$PUBLIC_IPV4/__version"
 docker compose logs nginx
 ```
 
-On a native Linux Docker host, `curl http://127.0.0.1/` is also a useful local-bind check. On Colima or another Linux VM workflow, use the bridged `PUBLIC_IPV4` from `.env` for host-side verification.
+On a native Linux Docker host, `curl http://127.0.0.1/` is also a useful local-bind check. On Colima or another Linux VM workflow, prefer the bridged `PUBLIC_IPV4` from `.env` for host-side verification because it matches the VM's real service identity. Current Colima releases may also forward those listeners onto macOS `127.0.0.1`, but that is a convenience path rather than the canonical DVRTC endpoint.
 
 ## Related Documentation
 

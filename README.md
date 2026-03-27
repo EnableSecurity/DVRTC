@@ -77,7 +77,7 @@ Wrapper scripts for the bundled test suites:
 ./scripts/attacker-run-all.sh
 ```
 
-Use `PUBLIC_IPV4` from `.env` for browser and host-side access checks. The `testing` runner targets `127.0.0.1`, even when Docker is running inside Colima or another Linux VM. See [TESTING.md](TESTING.md) for the full command reference.
+Use `PUBLIC_IPV4` from `.env` for browser and host-side access checks. On Colima or another Linux VM workflow, that VM address is the canonical DVRTC endpoint even if the platform also forwards ports onto the macOS host. The `testing` runner targets `127.0.0.1` inside the Linux host network namespace. See [TESTING.md](TESTING.md) for the full command reference.
 
 For a quick manual SIP check, register extension `1000` with password `1500` in a SIP client and call `1200` for the echo service.
 
@@ -92,8 +92,6 @@ For a quick manual SIP check, register extension `1000` with password `1500` in 
 ## Inspiration
 
 DVRTC was inspired by vulnerable training platforms like [DVWA](https://github.com/digininja/DVWA), [WebGoat](https://owasp.org/www-project-webgoat/), and [WrongSecrets](https://github.com/OWASP/wrongsecrets).
-
-A nod to the team at Sipera VIPER Lab for their historic work building intentionally vulnerable VoIP lab environments and releasing tools like UCSniff and VAST (VIPER Assessment Security Tools). Their contributions to VoIP security research are still appreciated.
 
 ## License
 
