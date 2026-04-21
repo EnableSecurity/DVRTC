@@ -596,11 +596,12 @@ def mode_tcp_http_get(args: argparse.Namespace) -> int:
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="TURN ACL probe")
+    p = argparse.ArgumentParser(description="Probe TURN allocation, permission, and relay behavior")
     sub = p.add_subparsers(dest="mode", required=True)
+    default_host = os.environ.get("PUBLIC_IPV4", "").strip() or "127.0.0.1"
 
     p_ua = sub.add_parser("unauth-allocate", help="Check unauthenticated ALLOCATE behavior")
-    p_ua.add_argument("--host", required=True)
+    p_ua.add_argument("--host", default=default_host)
     p_ua.add_argument("--port", type=int, default=3478)
     p_ua.add_argument("--tls", action="store_true", help="Use TCP+TLS transport")
     p_ua.add_argument("--expect", choices=["allow", "deny"], default="deny")
@@ -608,11 +609,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p_ua.set_defaults(func=mode_unauth_allocate)
 
     p_cp = sub.add_parser("create-permission", help="Check authenticated CreatePermission behavior")
-    p_cp.add_argument("--host", required=True)
+    p_cp.add_argument("--host", default=default_host)
     p_cp.add_argument("--port", type=int, default=3478)
     p_cp.add_argument("--tls", action="store_true", help="Use TCP+TLS transport")
-    p_cp.add_argument("--username", required=True)
-    p_cp.add_argument("--password", required=True)
+    p_cp.add_argument("--username", default="user")
+    p_cp.add_argument("--password", default="joshua")
     p_cp.add_argument("--peer", required=True)
     p_cp.add_argument("--peer-port", type=int, default=80)
     p_cp.add_argument("--expect", choices=["allow", "deny"], required=True)
@@ -621,11 +622,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p_cp.set_defaults(func=mode_create_permission)
 
     p_http = sub.add_parser("tcp-http-get", help="Fetch an HTTP resource through a TURN TCP relay")
-    p_http.add_argument("--host", required=True)
+    p_http.add_argument("--host", default=default_host)
     p_http.add_argument("--port", type=int, default=3478)
     p_http.add_argument("--tls", action="store_true", help="Use TCP+TLS transport")
-    p_http.add_argument("--username", required=True)
-    p_http.add_argument("--password", required=True)
+    p_http.add_argument("--username", default="user")
+    p_http.add_argument("--password", default="joshua")
     p_http.add_argument("--peer", required=True)
     p_http.add_argument("--peer-port", type=int, default=80)
     p_http.add_argument("--path", default="/")

@@ -12,13 +12,27 @@ CONFIG_DIR="/home/baresip/.baresip"
 TEMPLATE_ACCOUNTS="${CONFIG_DIR}/accounts.template"
 LIVE_ACCOUNTS="${CONFIG_DIR}/accounts"
 
+select_net_interface() {
+    if [ -n "${BARESIP_NET_INTERFACE:-}" ]; then
+        printf '%s\n' "$BARESIP_NET_INTERFACE"
+        return 0
+    fi
+
+    if [ -r /proc/net/route ]; then
+        awk '$2 == "00000000" { print $1; exit }' /proc/net/route
+        return 0
+    fi
+
+    return 0
+}
+
 log_info() {
     [ "$CALLGEN_LOG_LEVEL" = "info" ] || return 0
-    echo "$@"
+    printf '%s: %s\n' "$(date)" "$*"
 }
 
 log_warn() {
-    echo "$@" >&2
+    printf '%s: %s\n' "$(date)" "$*" >&2
 }
 
 # Replace password placeholder in a fresh copy of the template while escaping
@@ -61,6 +75,13 @@ CALL_DEST=${CALL_DEST:-1300}
 SOUNDS_DIR="/home/baresip/sounds"
 CURRENT_LINK="${SOUNDS_DIR}/current.wav"
 
+BARESIP_NET_IFACE="$(select_net_interface)"
+BARESIP_NET_ARGS=""
+if [ -n "$BARESIP_NET_IFACE" ]; then
+    BARESIP_NET_ARGS="-n $BARESIP_NET_IFACE"
+    log_info "Using baresip network interface: ${BARESIP_NET_IFACE}"
+fi
+
 # Main loop - make sequential calls using -e option
 while true; do
     # Pick a random WAV file for this call
@@ -68,9 +89,9 @@ while true; do
     if [ -n "$WAV_FILES" ]; then
         CHOSEN=$(echo "$WAV_FILES" | shuf -n 1)
         ln -sf "$CHOSEN" "$CURRENT_LINK"
-        log_info "$(date): Making call to ${CALL_DEST} with audio: $(basename "$CHOSEN")"
+        log_info "Making call to ${CALL_DEST} with audio: $(basename "$CHOSEN")"
     else
-        log_warn "$(date): No audio files found; calling ${CALL_DEST} with silence"
+        log_warn "No audio files found; calling ${CALL_DEST} with silence"
     fi
 
     # Run baresip with -e to dial, -t to auto-quit cleanly after duration
@@ -78,9 +99,9 @@ while true; do
     # The outer timeout is a last-resort safety net with extra headroom so
     # baresip's -t always fires first and never races with a SIGKILL.
     LOG_FILE=$(mktemp)
-    if timeout $((CALL_DURATION + EXIT_GRACE)) baresip -f "$CONFIG_DIR" \
-        -e "d sip:${CALL_DEST}@127.0.0.1" \
-        -t $CALL_DURATION \
+    if timeout $((CALL_DURATION + EXIT_GRACE)) sh -c '
+        exec baresip ${1:+-n "$1"} -f "$2" -e "$3" -t "$4"
+    ' sh "$BARESIP_NET_IFACE" "$CONFIG_DIR" "d sip:${CALL_DEST}@127.0.0.1" "$CALL_DURATION" \
         >"$LOG_FILE" 2>&1; then
         if [ "$CALLGEN_LOG_LEVEL" = "info" ]; then
             cat "$LOG_FILE"
@@ -89,11 +110,11 @@ while true; do
         fi
     else
         STATUS=$?
-        log_warn "$(date): baresip exited with status ${STATUS} while calling ${CALL_DEST}"
+        log_warn "baresip exited with status ${STATUS} while calling ${CALL_DEST}"
         sed -n '1,200p' "$LOG_FILE" >&2
     fi
     rm -f "$LOG_FILE"
 
-    log_info "$(date): Call completed, pausing ${CALL_PAUSE}s..."
+    log_info "Call completed, pausing ${CALL_PAUSE}s..."
     sleep $CALL_PAUSE
 done

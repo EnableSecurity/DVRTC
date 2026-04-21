@@ -1,0 +1,148 @@
+@import url('/call/css/pressstart.css');
+
+html {
+  background: #00000c;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    linear-gradient(rgba(126, 189, 190, 0.05), rgba(126, 189, 190, 0.05)),
+    repeating-linear-gradient(
+      0deg,
+      rgba(176, 253, 255, 0.03) 0,
+      rgba(176, 253, 255, 0.03) 2px,
+      transparent 2px,
+      transparent 4px
+    ),
+    #00000c;
+  color: #b0fdff;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  line-height: 1.8;
+  text-transform: uppercase;
+  image-rendering: pixelated;
+}
+
+body::before {
+  content: 'PBX1 :: VOICEMAIL ARCHIVE';
+  display: block;
+  margin: 0;
+  padding: 32px 24px 10px;
+  color: #ffffff;
+  font-size: 18px;
+  line-height: 1.6;
+  text-shadow: 0 0 18px #7ebdbe;
+}
+
+body::after {
+  content: 'AUTHORIZED ARCHIVE BROWSER — FILE ACCESS LOGGING MAY BE ENABLED';
+  display: block;
+  padding: 0 24px 24px;
+  color: #5d9293;
+  font-size: 10px;
+  line-height: 1.8;
+}
+
+h1 {
+  margin: 0 24px 24px;
+  padding: 16px;
+  border: 2px solid #2a5b5c;
+  color: #b0fdff;
+  background: rgba(11, 24, 34, 0.75);
+  box-shadow: inset 0 0 0 2px rgba(176, 253, 255, 0.06), 0 0 26px rgba(126, 189, 190, 0.18);
+  font-size: 11px;
+  line-height: 1.8;
+  word-break: break-word;
+}
+
+hr,
+address {
+  display: none;
+}
+
+a {
+  color: #b0fdff;
+  text-decoration: none;
+  text-shadow: 0 0 10px rgba(176, 253, 255, 0.28);
+}
+
+a:hover {
+  color: #ffffff;
+  text-shadow: 0 0 18px rgba(176, 253, 255, 0.7);
+}
+
+table {
+  width: calc(100% - 48px);
+  margin: 0 24px 40px;
+  border-collapse: collapse;
+  border: 2px solid #2a5b5c;
+  background: rgba(4, 10, 18, 0.88);
+  box-shadow: 0 0 28px rgba(93, 146, 147, 0.16);
+}
+
+th,
+td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(93, 146, 147, 0.35);
+  vertical-align: top;
+}
+
+th {
+  color: #7ebdbe;
+  background: rgba(20, 38, 48, 0.92);
+  font-size: 10px;
+}
+
+tbody tr {
+  background: rgba(3, 8, 14, 0.94);
+}
+
+tbody tr:nth-child(even) {
+  background: rgba(10, 18, 28, 0.94);
+}
+
+tbody tr:hover td {
+  background: rgba(176, 253, 255, 0.07);
+}
+
+th:nth-child(2),
+td:nth-child(2),
+th:nth-child(3),
+td:nth-child(3) {
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  body {
+    font-size: 10px;
+  }
+
+  body::before {
+    padding: 24px 16px 8px;
+    font-size: 14px;
+  }
+
+  body::after {
+    padding: 0 16px 16px;
+    font-size: 8px;
+  }
+
+  h1 {
+    margin: 0 16px 16px;
+    padding: 12px;
+    font-size: 9px;
+  }
+
+  table {
+    width: calc(100% - 32px);
+    margin: 0 16px 28px;
+  }
+
+  th,
+  td {
+    padding: 10px;
+    font-size: 8px;
+  }
+}

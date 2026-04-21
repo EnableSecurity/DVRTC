@@ -6,7 +6,7 @@ One or two sentences: what you will do and what vulnerability you are exploiting
 
 ## Prerequisites
 
-- DVRTC running, usually with `docker compose up -d`
+- DVRTC running, usually with `./scripts/compose.sh --scenario pbx1 up -d`
 - Any services that the exercise depends on
 - Tools needed (e.g. sipvicious, Wireshark)
 
@@ -22,7 +22,7 @@ Prefer the `testing` service for packet capture, sniffing, or other host-local d
 State whether each command runs on the host, in `testing`, or in `attacker`.
 Files written under `/work` from `testing` or `attacker` persist to the host's `artifacts/` directory.
 
-If an exercise needs several consecutive commands from one service, prefer starting one interactive shell in that service and running the tool commands inside it instead of repeating `docker compose run --rm ...` on every step.
+If an exercise needs several consecutive commands from one service, prefer starting one interactive shell in that service with `./scripts/compose.sh --scenario ... run --rm ...` and running the tool commands inside it instead of repeating the wrapper command on every step.
 
 ### Step 1: Description
 

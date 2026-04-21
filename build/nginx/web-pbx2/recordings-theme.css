@@ -1,0 +1,152 @@
+@import url('https://fonts.googleapis.com/css2?family=Aldrich&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --red: #ff2a00;
+  --red-glow: rgba(255, 42, 0, 0.45);
+  --red-faint: rgba(255, 42, 0, 0.08);
+  --white: #efefef;
+  --grey: #888;
+  --line: rgba(255, 42, 0, 0.22);
+  --bg: #040404;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at center, #101010 0%, #040404 55%, #000000 100%);
+  color: var(--white);
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+  font-size: 15px;
+  line-height: 1.7;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.14) 2px,
+    rgba(0, 0, 0, 0.14) 4px
+  );
+  pointer-events: none;
+}
+
+body::after {
+  content: 'PBX2 / COMMUNICATION ARCHIVES / ALL RECORDINGS ARE BEING RETAINED';
+  display: block;
+  margin: 0;
+  padding: 30px 28px 14px;
+  color: var(--red);
+  font-family: 'Aldrich', sans-serif;
+  font-size: 24px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  text-shadow: 0 0 18px var(--red-glow);
+}
+
+h1 {
+  margin: 0 28px 22px;
+  padding: 18px 22px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 42, 0, 0.08), rgba(255, 42, 0, 0.03));
+  color: #f5f5f5;
+  font-family: 'Aldrich', sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  box-shadow: 0 0 28px rgba(255, 42, 0, 0.12), inset 0 0 20px rgba(255, 42, 0, 0.04);
+  word-break: break-word;
+}
+
+hr,
+address {
+  display: none;
+}
+
+a {
+  color: var(--red);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--white);
+  text-shadow: 0 0 12px var(--red-glow);
+}
+
+table {
+  width: calc(100% - 56px);
+  margin: 0 28px 36px;
+  border-collapse: collapse;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 30px rgba(255, 42, 0, 0.08);
+}
+
+th,
+td {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 42, 0, 0.12);
+}
+
+th {
+  color: #ff8b72;
+  background: rgba(255, 42, 0, 0.06);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 12px;
+}
+
+tbody tr {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+tbody tr:nth-child(even) {
+  background: rgba(18, 5, 2, 0.72);
+}
+
+tbody tr:hover td {
+  background: var(--red-faint);
+}
+
+th:nth-child(2),
+td:nth-child(2),
+th:nth-child(3),
+td:nth-child(3) {
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  body {
+    font-size: 13px;
+  }
+
+  body::after {
+    padding: 22px 16px 10px;
+    font-size: 15px;
+  }
+
+  h1 {
+    margin: 0 16px 16px;
+    padding: 14px 16px;
+    font-size: 14px;
+  }
+
+  table {
+    width: calc(100% - 32px);
+    margin: 0 16px 24px;
+  }
+
+  th,
+  td {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+}

@@ -1,0 +1,40 @@
+server {
+	listen 80 default_server;
+	listen [::]:80 default_server;
+
+	listen 443 ssl default_server;
+	listen [::]:443 ssl default_server;
+
+	include /etc/nginx/options-ssl-nginx.conf;
+	ssl_certificate /etc/certstore/fullchain.pem;
+	ssl_certificate_key /etc/certstore/privkey.pem;
+
+	ssl_dhparam /etc/certstore/ssl-dhparams.pem;
+
+	root /var/www/html;
+	index index.html index.htm index.nginx-debian.html;
+	server_name _;
+
+	location / {
+		try_files $uri $uri/ =404;
+	}
+
+	location = /healthz {
+		access_log off;
+		add_header Content-Type text/plain;
+		return 200 "ok";
+	}
+
+	location = /__version {
+		access_log off;
+		default_type application/json;
+		alias /usr/share/dvrtc/version.json;
+	}
+
+	location /recordings {
+		fancyindex on;
+		fancyindex_exact_size off;
+		fancyindex_css_href /recordings-theme.css;
+		add_header Link "<$scheme://$http_host$uri>; rel=\"canonical\"";
+	}
+}

@@ -27,6 +27,7 @@ SCRIPT_PATH = Path(__file__).with_name("dvrtc-checks.py")
 dvrtc_checks = load_script_module("dvrtc_checks", SCRIPT_PATH)
 digestleak = load_script_module("digestleak_helper", Path(__file__).with_name("digestleak.py"))
 turn_probe = load_script_module("turn_probe_helper", Path(__file__).with_name("turn-probe.py"))
+dvrtc_attack_common = load_script_module("dvrtc_attack_common_test_helper", Path(__file__).with_name("dvrtc_attack_common.py"))
 
 
 def make_args(**overrides: object) -> argparse.Namespace:
@@ -34,8 +35,10 @@ def make_args(**overrides: object) -> argparse.Namespace:
         "host": "127.0.0.1",
         "mysql_port": 23306,
         "extension": "1000",
+        "extensions": "1200,1000,9999",
         "username": "1000",
         "password": "1500",
+        "expect": [],
         "timeout": 10.0,
         "requests": 10,
         "collect_seconds": 1.0,
@@ -57,6 +60,11 @@ def make_args(**overrides: object) -> argparse.Namespace:
         "ami_port": 5038,
         "local_port": None,
         "register_only": False,
+        "response_window": 3.0,
+        "target_did": "9000",
+        "expected_early_media_code": 183,
+        "injected_extension": "",
+        "query_did": "",
     }
     defaults.update(overrides)
     return argparse.Namespace(**defaults)
@@ -106,6 +114,12 @@ class DigestHelpersTest(unittest.TestCase):
                 "$sip$*2000*asterisk*REGISTER*"
                 "sip:2000@127.0.0.1:5060;transport=udp*nonce*cnonce*00000001*auth*deadbeef"
             )
+        )
+
+    def test_expand_extension_spec_expands_numeric_ranges(self) -> None:
+        self.assertEqual(
+            dvrtc_checks._expand_extension_spec("0998-1000,1200,9999"),
+            ["0998", "0999", "1000", "1200", "9999"],
         )
 
 
@@ -161,6 +175,73 @@ class CommandHandlersTest(unittest.TestCase):
         with mock.patch.object(dvrtc_checks, "_probe_options", return_value=responses):
             self.assertEqual(dvrtc_checks.cmd_enum(make_args(extension="2000")), 1)
 
+    def test_invite_enum_succeeds_with_expected_classifications(self) -> None:
+        responses = {
+            "1200": [
+                dvrtc_checks.SipResponse(100, {}),
+                dvrtc_checks.SipResponse(200, {"content-type": "application/sdp"}, "v=0\r\n"),
+            ],
+            "1000": [
+                dvrtc_checks.SipResponse(100, {}),
+                dvrtc_checks.SipResponse(
+                    480,
+                    {"reason": 'SIP;cause=806;text="USER_NOT_REGISTERED"'},
+                ),
+            ],
+            "9999": [
+                dvrtc_checks.SipResponse(100, {}),
+                dvrtc_checks.SipResponse(
+                    183,
+                    {"content-type": "application/sdp"},
+                    "v=0\r\n",
+                ),
+                dvrtc_checks.SipResponse(
+                    480,
+                    {"reason": 'Q.850;cause=16;text="NORMAL_CLEARING"'},
+                ),
+            ],
+        }
+
+        def fake_probe(host: str, extension: str, user_agent: str, response_window: float = 3.0):
+            self.assertEqual(host, "127.0.0.1")
+            self.assertEqual(user_agent, "DVRTC-Invite-Enum")
+            self.assertEqual(response_window, 3.0)
+            return responses[extension]
+
+        with mock.patch.object(dvrtc_checks, "_probe_invite", side_effect=fake_probe):
+            self.assertEqual(
+                dvrtc_checks.cmd_invite_enum(
+                    make_args(
+                        extensions="1200,1000,9999",
+                        expect=[
+                            "1200=routable",
+                            "1000=known-unregistered",
+                            "9999=invalid",
+                        ],
+                    )
+                ),
+                0,
+            )
+
+    def test_invite_enum_fails_on_expected_classification_mismatch(self) -> None:
+        responses = [
+            dvrtc_checks.SipResponse(100, {}),
+            dvrtc_checks.SipResponse(
+                480,
+                {"reason": 'Q.850;cause=16;text="NORMAL_CLEARING"'},
+            ),
+        ]
+        with mock.patch.object(dvrtc_checks, "_probe_invite", return_value=responses):
+            self.assertEqual(
+                dvrtc_checks.cmd_invite_enum(
+                    make_args(
+                        extensions="9999",
+                        expect=["9999=routable"],
+                    )
+                ),
+                1,
+            )
+
     def test_weak_cred_requires_successful_authenticated_register(self) -> None:
         responses = [dvrtc_checks.SipResponse(401, {}), dvrtc_checks.SipResponse(200, {})]
         with mock.patch.object(
@@ -169,6 +250,34 @@ class CommandHandlersTest(unittest.TestCase):
             return_value=responses,
         ):
             self.assertEqual(dvrtc_checks.cmd_weak_cred(make_args()), 0)
+
+    def test_freeswitch_lua_sqli_delegates_to_shared_attack_helper(self) -> None:
+        with mock.patch.object(
+            dvrtc_checks.dvrtc_attack_common,
+            "run_freeswitch_lua_sqli_check",
+            return_value=0,
+        ) as helper:
+            self.assertEqual(
+                dvrtc_checks.cmd_freeswitch_lua_sqli(
+                    make_args(
+                        extension="2001",
+                        target_did="9000",
+                        expected_early_media_code=183,
+                        response_window=4.0,
+                    )
+                ),
+                0,
+            )
+
+        helper.assert_called_once_with(
+            "127.0.0.1",
+            "2001",
+            target_did="9000",
+            query_did="",
+            injected_extension="",
+            expected_early_media_code=183,
+            response_window=4.0,
+        )
 
     def test_offline_crack_accepts_john_sip_hash_and_reports_success(self) -> None:
         args = make_args(
@@ -193,6 +302,24 @@ class CommandHandlersTest(unittest.TestCase):
             )
         )
         self.assertEqual(dvrtc_checks.cmd_offline_crack(args), 1)
+
+    def test_rtp_bleed_resolves_helper_from_real_script_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            link_path = Path(tmp) / "dvrtc-checks-link.py"
+            link_path.symlink_to(SCRIPT_PATH.resolve())
+            linked_module = load_script_module("dvrtc_checks_via_symlink", link_path)
+            expected_script = SCRIPT_PATH.resolve().with_name("rtpbleed.py")
+            run_result = subprocess.CompletedProcess(
+                ["python3", str(expected_script)],
+                0,
+                "[+] RTP response from 127.0.0.1:35000 (172 bytes)\n",
+                "",
+            )
+
+            with mock.patch.object(linked_module, "_run_capture", return_value=run_result) as mock_run:
+                self.assertEqual(linked_module.cmd_rtp_bleed(make_args(attempts=1)), 0)
+
+            self.assertEqual(mock_run.call_args.args[0][1], str(expected_script))
 
     def test_weak_cred_svcrack_accepts_expected_password(self) -> None:
         args = make_args(
@@ -243,6 +370,20 @@ class TcpWsHelpersTest(unittest.TestCase):
         data = dvrtc_checks._recv_tcp_sip_data(sock, timeout=1.0)
         self.assertIn(b"401", data)
         self.assertEqual(sock.call_count, 1)
+
+    def test_parse_sip_message_keeps_body(self) -> None:
+        response = dvrtc_checks._parse_sip_message(
+            (
+                b"SIP/2.0 200 OK\r\n"
+                b"Content-Type: application/sdp\r\n"
+                b"Content-Length: 5\r\n"
+                b"\r\n"
+                b"v=0\r\n"
+            )
+        )
+        self.assertEqual(response.code, 200)
+        self.assertEqual(response.headers["content-type"], "application/sdp")
+        self.assertEqual(response.body, "v=0\r\n")
 
     def test_run_kamcmd_returns_stdout(self) -> None:
         result = subprocess.CompletedProcess(["kamcmd"], 0, "some output\n", "")
@@ -337,6 +478,28 @@ class WrapperScriptsTest(unittest.TestCase):
         fake_python.chmod(0o755)
         return fake_python, log_file
 
+    def _make_fake_tool(self, tmpdir: Path, name: str) -> None:
+        tool = tmpdir / name
+        tool.write_text(
+            dedent(
+                f"""\
+                #!/bin/sh
+                set -eu
+
+                log_file="$FAKE_PYTHON_LOG"
+                {{
+                    printf 'TOOL:{name}\\n'
+                    for arg in "$@"; do
+                        printf 'ARG:%s\\n' "$arg"
+                    done
+                    printf '\\n'
+                }} >>"$log_file"
+                exit 0
+                """
+            )
+        )
+        tool.chmod(0o755)
+
     def test_smoke_wrapper_forwards_target_arguments(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmpdir = Path(tmp)
@@ -369,6 +532,9 @@ class WrapperScriptsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             tmpdir = Path(tmp)
             fake_python, log_file = self._make_fake_python(tmpdir)
+            self._make_fake_tool(tmpdir, "sqli")
+            self._make_fake_tool(tmpdir, "xss")
+            self._make_fake_tool(tmpdir, "freeswitch-lua-sqli")
             env = os.environ.copy()
             env["PATH"] = f"{tmpdir}:{env['PATH']}"
             env["FAKE_PYTHON_LOG"] = str(log_file)
@@ -390,6 +556,8 @@ class WrapperScriptsTest(unittest.TestCase):
             self.assertIn("ARG:2444", log)
             self.assertIn("SCRIPT:/opt/testing/scripts/digestleak.py", log)
             self.assertIn("SCRIPT:/opt/testing/scripts/turn-probe.py", log)
+            self.assertIn("TOOL:sqli", log)
+            self.assertIn("TOOL:xss", log)
 
 
 class NewCommandHandlersTest(unittest.TestCase):
@@ -481,6 +649,80 @@ class NewCommandHandlersTest(unittest.TestCase):
         ):
             args = make_args(kamcmd_addr="tcp:127.0.0.1:2046")
             self.assertEqual(dvrtc_checks.cmd_digestleak_registered(args), 1)
+
+    def test_digestleak_auth_passes(self) -> None:
+        unauth = [dvrtc_checks.SipResponse(401, {"www-authenticate": ["Digest realm=\"127.0.0.1\""]})]
+        bad_auth = [dvrtc_checks.SipResponse(403, {})]
+        with (
+            mock.patch.object(dvrtc_checks, "_probe_register", return_value=unauth),
+            mock.patch.object(
+                dvrtc_checks, "_probe_authenticated_register", return_value=bad_auth,
+            ),
+        ):
+            args = make_args(timeout=5.0)
+            self.assertEqual(dvrtc_checks.cmd_digestleak_auth(args), 0)
+
+    def test_digestleak_auth_fails_without_challenge(self) -> None:
+        with mock.patch.object(
+            dvrtc_checks, "_probe_register",
+            return_value=[dvrtc_checks.SipResponse(403, {})],
+        ):
+            args = make_args(timeout=5.0)
+            self.assertEqual(dvrtc_checks.cmd_digestleak_auth(args), 1)
+
+    def test_digestleak_auth_fails_when_wrong_password_accepted(self) -> None:
+        unauth = [dvrtc_checks.SipResponse(401, {"www-authenticate": ["Digest realm=\"127.0.0.1\""]})]
+        accepted = [dvrtc_checks.SipResponse(200, {})]
+        with (
+            mock.patch.object(dvrtc_checks, "_probe_register", return_value=unauth),
+            mock.patch.object(
+                dvrtc_checks, "_probe_authenticated_register", return_value=accepted,
+            ),
+        ):
+            args = make_args(timeout=5.0)
+            self.assertEqual(dvrtc_checks.cmd_digestleak_auth(args), 1)
+
+    def test_digestleak_public_register_blocked_passes_without_challenge(self) -> None:
+        with (
+            mock.patch.object(
+                dvrtc_checks, "_probe_register",
+                return_value=[dvrtc_checks.SipResponse(403, {})],
+            ),
+            mock.patch.object(
+                dvrtc_checks, "_probe_authenticated_register",
+                side_effect=RuntimeError("did not receive a digest authentication challenge"),
+            ),
+        ):
+            args = make_args(timeout=5.0)
+            self.assertEqual(dvrtc_checks.cmd_digestleak_public_register_blocked(args), 0)
+
+    def test_digestleak_public_register_blocked_passes_when_auth_still_blocked(self) -> None:
+        with (
+            mock.patch.object(
+                dvrtc_checks, "_probe_register",
+                return_value=[dvrtc_checks.SipResponse(401, {"www-authenticate": ["Digest realm=\"127.0.0.1\""]})],
+            ),
+            mock.patch.object(
+                dvrtc_checks, "_probe_authenticated_register",
+                return_value=[dvrtc_checks.SipResponse(403, {})],
+            ),
+        ):
+            args = make_args(timeout=5.0)
+            self.assertEqual(dvrtc_checks.cmd_digestleak_public_register_blocked(args), 0)
+
+    def test_digestleak_public_register_blocked_fails_when_known_password_accepted(self) -> None:
+        with (
+            mock.patch.object(
+                dvrtc_checks, "_probe_register",
+                return_value=[dvrtc_checks.SipResponse(401, {"www-authenticate": ["Digest realm=\"127.0.0.1\""]})],
+            ),
+            mock.patch.object(
+                dvrtc_checks, "_probe_authenticated_register",
+                return_value=[dvrtc_checks.SipResponse(200, {})],
+            ),
+        ):
+            args = make_args(timeout=5.0)
+            self.assertEqual(dvrtc_checks.cmd_digestleak_public_register_blocked(args), 1)
 
     def test_sip_transport_passes_all_transports(self) -> None:
         ok = [dvrtc_checks.SipResponse(401, {})]
@@ -591,9 +833,11 @@ class CommandLineAccessTest(unittest.TestCase):
         commands = (
             ["smoke", "--help"],
             ["enum", "--help"],
+            ["invite-enum", "--help"],
             ["weak-cred", "--help"],
             ["weak-cred-svcrack", "--help"],
             ["sqli", "--help"],
+            ["freeswitch-lua-sqli", "--help"],
             ["xss", "--help"],
             ["sip-flood", "--help"],
             ["offline-crack", "--help"],
@@ -623,9 +867,11 @@ class CommandLineAccessTest(unittest.TestCase):
         cases = [
             ("smoke", ["smoke"]),
             ("enum", ["enum"]),
+            ("invite-enum", ["invite-enum"]),
             ("weak-cred", ["weak-cred"]),
             ("weak-cred-svcrack", ["weak-cred-svcrack"]),
             ("sqli", ["sqli"]),
+            ("freeswitch-lua-sqli", ["freeswitch-lua-sqli"]),
             ("xss", ["xss"]),
             ("sip-flood", ["sip-flood"]),
             ("offline-crack", ["offline-crack", "--hash-line", "$sip$*u*r*m*sip:u@h*n*c*1*auth*r"]),

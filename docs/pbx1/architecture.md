@@ -4,9 +4,9 @@ This document describes the current `pbx1` scenario as it exists in this reposit
 
 ## Scope
 
-- `pbx1` is the only active scenario in this repository
-- the runtime entrypoint is `docker-compose.yml`
-- local rebuilds use `docker-compose.dev.yml` and are documented in [../development.md](../development.md)
+- `pbx1` is one of the two active scenarios in this repository
+- the runtime entrypoint is `compose/base.yml` together with `compose/pbx1.yml`
+- local rebuilds use `compose/dev.yml` together with `compose/dev.pbx1.yml` and are documented in [../development.md](../development.md)
 
 ## Stack At A Glance
 
@@ -15,8 +15,8 @@ This document describes the current `pbx1` scenario as it exists in this reposit
 | Kamailio | Public SIP edge, WS/WSS edge, SIP-to-SQL logging path | `5060` UDP/TCP, `5061` TCP, `8000` TCP, `8443` TCP | `build/kamailio/config/kamailio.cfg`, `build/kamailio/config/tls.cfg`, `build/kamailio/run.sh` |
 | Asterisk | Back-end PBX, endpoints, voicemail, echo targets | receives forwarded SIP from Kamailio, serves RTP via host networking | `build/asterisk/config/pjsip.conf`, `build/asterisk/config/extensions.conf`, `build/asterisk/config/voicemail.conf`, `build/asterisk/config/rtp.conf` |
 | rtpengine | Media proxy between clients and Asterisk | `35000-40000` UDP | `build/rtpengine/run.sh`, `build/rtpengine/healthcheck/healthcheck.sh` |
-| coturn | TURN/STUN service | `3478` UDP/TCP, `5349` TCP/TLS | `docker-compose.yml` |
-| Nginx | HTTP/HTTPS surface, voicemail exposure, browser softphone, user-agent log UI | `80` TCP, `443` TCP | `build/nginx/config/sites-available/default`, `build/nginx/web/` |
+| coturn | TURN/STUN service | `3478` UDP/TCP, `5349` TCP/TLS | `compose/pbx1.yml` |
+| Nginx | HTTP/HTTPS surface, voicemail exposure, browser softphone, user-agent log UI | `80` TCP, `443` TCP | `build/nginx/config/sites-available/default.pbx1`, `build/nginx/web-pbx1/` |
 | MySQL | Stores User-Agent logs and seeded fake customer data | `23306` TCP by default via `MYSQL_PORT` | `build/kamailio/run.sh`, `build/mysql/validate-and-start.sh`, `build/mysqlclient/dump-uas.py` |
 
 ## Topology
@@ -216,7 +216,7 @@ The lab depends on several helper containers that make the exercises repeatable.
 
 `baresip-callgen`, `baresip-callgen-b`, and `baresip-callgen-c` keep extension `1300` active.
 
-Current behavior from `docker-compose.yml`:
+Current behavior from `compose/pbx1.yml`:
 
 - three staggered callers
 - `CALL_DURATION=20`
@@ -271,7 +271,7 @@ Certificates are read from `data/certs/`.
 
 ### Image Model
 
-The runtime compose file uses published, versioned images. The repo-root `VERSION` file is the release source of truth, and local source rebuilds are opt-in via `docker-compose.dev.yml`.
+The runtime compose files use published, versioned images. The repo-root `VERSION` file is the release source of truth, and local source rebuilds are opt-in via the dev override files.
 
 Published runtime images expose a standard metadata file at `/usr/share/dvrtc/version.json`, and nginx serves that information at `GET /__version` for quick release checks.
 

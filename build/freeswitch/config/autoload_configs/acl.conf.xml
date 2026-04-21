@@ -1,0 +1,6 @@
+<configuration name="acl.conf" description="Network Lists">
+  <network-lists>
+    <list name="allowall" default="allow">
+    </list>
+  </network-lists>
+</configuration>

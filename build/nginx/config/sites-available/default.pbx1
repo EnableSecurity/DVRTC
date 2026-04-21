@@ -7,21 +7,16 @@ server {
 	listen [::]:443 ssl default_server;
 
 	include /etc/nginx/options-ssl-nginx.conf;
-	ssl_certificate /etc/certstore/fullchain.pem; 
+	ssl_certificate /etc/certstore/fullchain.pem;
 	ssl_certificate_key /etc/certstore/privkey.pem;
 
 	ssl_dhparam /etc/certstore/ssl-dhparams.pem;
 
 	root /var/www/html;
-
-	# Add index.php to the list if you are using PHP
 	index index.html index.htm index.nginx-debian.html;
-
 	server_name _;
 
 	location / {
-		# First attempt to serve request as file, then
-		# as directory, then fall back to displaying a 404.
 		try_files $uri $uri/ =404;
 	}
 
@@ -47,6 +42,7 @@ server {
 	location /voicemail {
 		fancyindex on;
 		fancyindex_exact_size off;
+		fancyindex_css_href /voicemail-theme.css;
 		add_header Link "<$scheme://$http_host$uri>; rel=\"canonical\"";
 	}
 
@@ -73,7 +69,6 @@ server {
 
 	root /var/www/html;
 	index index.html index.htm index.nginx-debian.html;
-
 	server_name loopback-secret;
 
 	location = /healthz {
@@ -91,6 +86,7 @@ server {
 	location /voicemail {
 		fancyindex on;
 		fancyindex_exact_size off;
+		fancyindex_css_href /voicemail-theme.css;
 		add_header Link "<$scheme://$http_host$uri>; rel=\"canonical\"";
 	}
 

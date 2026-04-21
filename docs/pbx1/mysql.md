@@ -17,7 +17,7 @@ MySQL backs the `useragents` database used for SIP header logging and injection 
 |------|---------|
 | `build/mysql/validate-and-start.sh` | startup validation for required environment |
 | `build/mysql/Dockerfile` | image customizations |
-| `docker-compose.yml` | exposed port, credentials, and service wiring |
+| `compose/pbx1.yml` | exposed port, credentials, and service wiring |
 | `build/mysqlclient/dump-uas.py` | exports tracked user-agent data to JSON |
 | `build/dbcleaner/run.sh` | periodically truncates the `useragents` table |
 | `build/kamailio/run.sh` | creates the `useragents` schema and seeds fake customer data |
@@ -35,8 +35,8 @@ SIP endpoint authentication is not stored here; it lives in Asterisk configurati
 ## Verification
 
 ```bash
-docker compose run --rm testing python3 /opt/testing/scripts/dvrtc-checks.py sqli --host 127.0.0.1 --extension 1000
-docker compose logs db
+./scripts/compose.sh --scenario pbx1 run --rm testing sqli --host 127.0.0.1 --extension 1000
+./scripts/compose.sh --scenario pbx1 logs db
 ```
 
 ## Related Documentation

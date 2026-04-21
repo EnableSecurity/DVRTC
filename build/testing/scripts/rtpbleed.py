@@ -13,7 +13,13 @@ import time
 from typing import Set
 
 
-def build_rtp_packet(seq: int, timestamp: int, ssrc: int, payload_type: int) -> bytes:
+def build_rtp_packet(
+    seq: int,
+    timestamp: int,
+    ssrc: int,
+    payload_type: int,
+    payload_size: int,
+) -> bytes:
     version = 2
     padding = 0
     extension = 0
@@ -22,8 +28,7 @@ def build_rtp_packet(seq: int, timestamp: int, ssrc: int, payload_type: int) -> 
     first = (version << 6) | (padding << 5) | (extension << 4) | csrc_count
     second = (marker << 7) | (payload_type & 0x7F)
     header = struct.pack("!BBHII", first, second, seq & 0xFFFF, timestamp & 0xFFFFFFFF, ssrc)
-    # 20 ms of G.711-like payload length (160 bytes) is sufficient for probing.
-    payload = b"\x7f" * 160
+    payload = b"\x7f" * max(1, payload_size)
     return header + payload
 
 
@@ -82,6 +87,18 @@ def parse_args() -> argparse.Namespace:
         help="Extra listen time after each full spray cycle when --duration is used (default: 0.05)",
     )
     p.add_argument("--payload-type", type=int, default=0, help="RTP payload type (default: 0)")
+    p.add_argument(
+        "--payload-size",
+        type=int,
+        default=160,
+        help="Probe payload size in bytes (default: 160)",
+    )
+    p.add_argument(
+        "--source-port",
+        type=int,
+        default=0,
+        help="Bind the probe socket to a fixed local UDP port (default: random)",
+    )
     p.add_argument("--first", action="store_true", help="Stop after first positive port")
     return p.parse_args()
 
@@ -98,7 +115,7 @@ def main() -> int:
     ssrc = random.randint(1, 0xFFFFFFFF)
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        sock.bind(("0.0.0.0", 0))
+        sock.bind(("0.0.0.0", args.source_port))
         sock.settimeout(args.timeout)
 
         if args.duration > 0:
@@ -106,7 +123,13 @@ def main() -> int:
             while time.monotonic() < deadline:
                 for port in range(args.start_port, args.end_port + 1):
                     for _ in range(max(args.probes, 1)):
-                        pkt = build_rtp_packet(seq, timestamp, ssrc, args.payload_type)
+                        pkt = build_rtp_packet(
+                            seq,
+                            timestamp,
+                            ssrc,
+                            args.payload_type,
+                            args.payload_size,
+                        )
                         sock.sendto(pkt, (args.host, port))
                         seq += 1
                         timestamp += 160
@@ -119,7 +142,13 @@ def main() -> int:
         else:
             for port in range(args.start_port, args.end_port + 1):
                 for _ in range(max(args.probes, 1)):
-                    pkt = build_rtp_packet(seq, timestamp, ssrc, args.payload_type)
+                    pkt = build_rtp_packet(
+                        seq,
+                        timestamp,
+                        ssrc,
+                        args.payload_type,
+                        args.payload_size,
+                    )
                     sock.sendto(pkt, (args.host, port))
                     seq += 1
                     timestamp += 160

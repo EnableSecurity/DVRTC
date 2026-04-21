@@ -7,6 +7,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 IMAGE_PREFIX="ghcr.io/enablesecurity/dvrtc"
 PUSH=0
+SCENARIO="pbx1"
 DEFAULT_SOURCE_URL="https://github.com/EnableSecurity/DVRTC"
 
 usage() {
@@ -15,6 +16,7 @@ Usage:
   ./scripts/build-latest-stubs.sh [options]
 
 Options:
+  --scenario pbx1|pbx2   Build latest stubs for the selected scenario image set
   --image-prefix PREFIX  Tag stub images under PREFIX/<service>
                          Default: ghcr.io/enablesecurity/dvrtc
   --push                 Push images after building
@@ -36,6 +38,10 @@ while [ $# -gt 0 ]; do
             PUSH=1
             shift
             ;;
+        --scenario)
+            SCENARIO="${2:?missing scenario}"
+            shift 2
+            ;;
         -h|--help)
             usage
             exit 0
@@ -51,8 +57,20 @@ done
 VERSION="$(tr -d '\n' < "$REPO_ROOT/VERSION")"
 VCS_REF="$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD)"
 DVRTC_SOURCE="${DVRTC_SOURCE:-$DEFAULT_SOURCE_URL}"
-SERVICES="asterisk rtpengine kamailio baresip-callgen baresip-digestleak nginx voicemailcleaner mysqlclient dbcleaner db testing"
 TMP_COMPOSE="$(mktemp "${TMPDIR:-/tmp}/dvrtc-latest-stubs.XXXXXX.yml")"
+
+case "$SCENARIO" in
+    pbx1)
+        SERVICES="asterisk rtpengine kamailio baresip-callgen baresip-digestleak nginx voicemailcleaner mysqlclient dbcleaner db testing"
+        ;;
+    pbx2)
+        SERVICES="pbx2-freeswitch pbx2-rtpproxy pbx2-opensips"
+        ;;
+    *)
+        echo "ERROR: Unknown scenario: $SCENARIO" >&2
+        exit 1
+        ;;
+esac
 
 cleanup() {
     rm -f "$TMP_COMPOSE"

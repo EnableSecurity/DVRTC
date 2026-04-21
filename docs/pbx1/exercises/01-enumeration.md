@@ -6,7 +6,7 @@ Use SIPVicious OSS `svwar` to identify valid SIP extensions on DVRTC by comparin
 
 ## Prerequisites
 
-- DVRTC running: `docker compose up -d`
+- DVRTC running: `./scripts/compose.sh --scenario pbx1 up -d`
 - SIPVicious OSS available in the `attacker` service
 
 ## Steps
@@ -24,7 +24,7 @@ Run on the host:
 Run on the host:
 
 ```bash
-docker compose run --rm attacker bash
+./scripts/compose.sh --scenario pbx1 run --rm attacker bash
 ```
 
 ### Step 3: Probe a known extension
@@ -53,6 +53,7 @@ In the attacker shell:
 
 ```bash
 sipvicious_svwar -e 9999 "udp://$PUBLIC_IPV4:5060" -v --debug
+exit
 ```
 
 `9999` should not be reported as valid. In the debug output, look for `SIP/2.0 404 enumerate me baby`. Valid targets produce a different response and are reported as existing by `svwar`.

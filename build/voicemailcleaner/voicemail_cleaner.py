@@ -1,18 +1,31 @@
 #!/usr/bin/env python3
+import logging
 import os
 import os.path
 import signal
 import sys
 import time
-import logging
 
-path = "/voicemail"
-maxfileage = 3600  # 1h
-maxfilesize = 1073741824  # 1gb
-maxdirsize = 5368709120  # 5gb
-maxfilecount = 100  # per directory
-sleep = 1  # 1 second
-dirnames = ["INBOX", "tmp"]
+log_level_name = os.environ.get("CLEAN_LOG_LEVEL", "INFO").upper()
+log_level = getattr(logging, log_level_name, logging.INFO)
+
+logging.basicConfig(
+    level=log_level,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
+
+path = os.environ.get("CLEAN_PATH", "/voicemail")
+mode = os.environ.get("CLEAN_MODE", "flat-subdirs")
+maxfileage = int(os.environ.get("MAX_FILE_AGE", "3600"))
+maxfilesize = int(os.environ.get("MAX_FILE_SIZE", "1073741824"))
+maxdirsize = int(os.environ.get("MAX_DIR_SIZE", "5368709120"))
+maxfilecount = int(os.environ.get("MAX_FILE_COUNT", "100"))
+sleep_interval = float(os.environ.get("CLEAN_SLEEP", "1"))
+subdirs = [
+    entry.strip()
+    for entry in os.environ.get("CLEAN_SUBDIRS", "INBOX,tmp").split(",")
+    if entry.strip()
+]
 
 
 def safe_stat(fullfn):
@@ -32,26 +45,62 @@ def safe_mtime(fullfn):
     return filestat.st_mtime
 
 
+def iter_files_recursive(dirname):
+    filenames = []
+    for root, _, files in os.walk(dirname):
+        for shortfn in files:
+            filenames.append(os.path.join(root, shortfn))
+    return filenames
+
+
+def collect_filenames(dirname):
+    if mode == "recursive":
+        return iter_files_recursive(dirname)
+
+    filenames = []
+    for shortfn in os.listdir(dirname):
+        filenames.append(os.path.join(dirname, shortfn))
+    return filenames
+
+
+def target_directories():
+    if mode == "recursive":
+        return [path]
+
+    if not subdirs:
+        return [path]
+
+    return [os.path.join(path, dirname) for dirname in subdirs]
+
+
 def main():
+    logging.info(
+        "storage cleaner starting: path=%s mode=%s max_age=%s max_file_size=%s max_dir_size=%s max_file_count=%s",
+        path,
+        mode,
+        maxfileage,
+        maxfilesize,
+        maxdirsize,
+        maxfilecount,
+    )
     while 1:
         marked4deletion = list()
-        for dirname in dirnames:
+        for dirname in target_directories():
             dirsize = 0
-            dirname = os.path.join(path, dirname)
             if not os.path.exists(dirname):
                 logging.info("creating directory %s" % dirname)
-                os.makedirs(dirname, exist_ok=True)
+                try:
+                    os.makedirs(dirname, exist_ok=True)
+                except OSError as exc:
+                    logging.warning("cannot create directory %s yet: %s", dirname, exc)
                 continue
             try:
-                shortfns = os.listdir(dirname)
+                filenames = collect_filenames(dirname)
             except FileNotFoundError:
                 continue
             except OSError as exc:
                 logging.warning("skipping directory %s: %s", dirname, exc)
                 continue
-            filenames = list()
-            for shortfn in shortfns:
-                filenames.append(os.path.join(dirname, shortfn))
             if len(filenames) > maxfilecount:
                 logging.info("directory %s exceeds max file count (%d > %d)" % (dirname, len(filenames), maxfilecount))
                 filenames.sort(key=safe_mtime)
@@ -82,7 +131,7 @@ def main():
                 continue
             except OSError as exc:
                 logging.warning("failed to remove %s: %s", fn, exc)
-        time.sleep(sleep)
+        time.sleep(sleep_interval)
 
 
 def receiveSignal(signalNumber, frame):

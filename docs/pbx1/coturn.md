@@ -13,7 +13,7 @@
 
 | File | Purpose |
 |------|---------|
-| `docker-compose.yml` | `coturn` command, listener policy, and health check |
+| `compose/pbx1.yml` | `coturn` command, listener policy, and health check |
 | `data/certs/` | certificate material for TURN/TLS use cases |
 | `docs/pbx1/exercises/06-turn-relay-abuse.md` | current hands-on abuse exercise |
 
@@ -33,9 +33,9 @@ Alongside the intentional vulnerabilities, coturn runs with several operational 
 
 ```bash
 . ./.env
-docker compose run --rm attacker python3 /opt/testing/scripts/turn-probe.py tcp-http-get --host "$PUBLIC_IPV4" --username user --password joshua --peer 127.0.0.1 --path /secret/
-docker compose run --rm attacker python3 /opt/testing/scripts/turn-probe.py tcp-http-get --tls --port 5349 --host "$PUBLIC_IPV4" --username user --password joshua --peer 127.0.0.1 --path /secret/
-docker compose logs coturn
+./scripts/compose.sh --scenario pbx1 run --rm attacker turn-probe tcp-http-get --host "$PUBLIC_IPV4" --username user --password joshua --peer 127.0.0.1 --path /secret/
+./scripts/compose.sh --scenario pbx1 run --rm attacker turn-probe tcp-http-get --tls --port 5349 --host "$PUBLIC_IPV4" --username user --password joshua --peer 127.0.0.1 --path /secret/
+./scripts/compose.sh --scenario pbx1 logs coturn
 ```
 
 ## Related Documentation

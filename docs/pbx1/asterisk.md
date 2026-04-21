@@ -34,10 +34,10 @@ Asterisk is the `pbx1` back-end PBX. Kamailio forwards SIP signaling to it over 
 Use the `testing` profile for repeatable checks:
 
 ```bash
-docker compose run --rm testing python3 /opt/testing/scripts/dvrtc-checks.py register --host 127.0.0.1
-docker compose run --rm testing python3 /opt/testing/scripts/dvrtc-checks.py bad-auth --host 127.0.0.1
-docker compose run --rm testing python3 /opt/testing/scripts/dvrtc-checks.py voicemail --host 127.0.0.1
-docker compose logs asterisk
+./scripts/compose.sh --scenario pbx1 run --rm testing dvrtc-checks register --host 127.0.0.1
+./scripts/compose.sh --scenario pbx1 run --rm testing dvrtc-checks bad-auth --host 127.0.0.1
+./scripts/compose.sh --scenario pbx1 run --rm testing dvrtc-checks voicemail --host 127.0.0.1
+./scripts/compose.sh --scenario pbx1 logs asterisk
 ```
 
 ## Related Documentation

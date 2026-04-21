@@ -4,9 +4,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y nginx libnginx-mod-http-fancyindex curl
 
-COPY config/sites-available/default /etc/nginx/sites-available/default
+COPY config/nginx.conf /etc/nginx/nginx.conf
+COPY config/sites-available/default.pbx1 /etc/nginx/sites-available/default.pbx1
+COPY config/sites-available/default.pbx2 /etc/nginx/sites-available/default.pbx2
 COPY config/options-ssl-nginx.conf /etc/nginx/options-ssl-nginx.conf
-COPY web/ /var/www/html/
+COPY web-pbx1/ /usr/share/dvrtc/site/pbx1/
+COPY web-pbx2/ /usr/share/dvrtc/site/pbx2/
 
 # Forward request logs to Docker log collector
 RUN ln -sf /dev/stdout /var/log/nginx/access.log \

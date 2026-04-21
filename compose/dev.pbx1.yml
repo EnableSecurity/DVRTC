@@ -1,11 +1,3 @@
-# Local development overrides for maintainers who need to rebuild images.
-# Prefer ./scripts/dev-compose.sh so DVRTC_VERSION defaults from VERSION and
-# VCS_REF defaults from git. Direct use of this file without DVRTC_VERSION set
-# still falls back to dev metadata.
-# Usage:
-#   ./scripts/dev-compose.sh build
-#   ./scripts/dev-compose.sh up -d
-
 services:
   asterisk:
     build:
@@ -114,23 +106,5 @@ services:
       args:
         DVRTC_VERSION: ${DVRTC_VERSION:-dev}
         DVRTC_SERVICE: db
-        VCS_REF: ${VCS_REF:-unknown}
-        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
-
-  testing:
-    build:
-      context: build/testing
-      args:
-        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
-        DVRTC_SERVICE: testing
-        VCS_REF: ${VCS_REF:-unknown}
-        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
-
-  attacker:
-    build:
-      context: build/testing
-      args:
-        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
-        DVRTC_SERVICE: testing
         VCS_REF: ${VCS_REF:-unknown}
         DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}

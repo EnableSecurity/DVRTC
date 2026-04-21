@@ -11,20 +11,24 @@ from collections.abc import Iterator, Sequence
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 import hashlib
+import dvrtc_attack_common
 import ipaddress
 import json
+import math
 import os
 from pathlib import Path
 import random
 import re
 import socket
 import ssl
+import struct
 import subprocess
 import sys
 import tempfile
 import time
 import urllib.error
 import urllib.request
+import wave
 from typing import Callable
 
 
@@ -32,6 +36,8 @@ DEFAULT_SIP_PORT = 5060
 HTTP_USER_AGENT = "dvrtc-checks/1.0"
 SIP_STATUS_RE = re.compile(r"^SIP/2.0\s+(\d{3})")
 DIGEST_PART_RE = re.compile(r'(\w+)=(".*?"|[^,]+)')
+INVITE_ENUM_DEFAULT_EXTENSIONS = "1200,1000,9999"
+FREESWITCH_LUA_SQLI_EXTENSION = "2001"
 
 
 @dataclass(frozen=True)
@@ -53,6 +59,7 @@ class SipDialog:
 class SipResponse:
     code: int
     headers: dict[str, str]
+    body: str = ""
 
 
 @dataclass
@@ -104,6 +111,26 @@ class SipSession:
         dialog = dialog or SipDialog.create()
         self.send(
             _build_options(
+                self.host,
+                extension,
+                self.local_ip,
+                self.local_port,
+                user_agent,
+                dialog=dialog,
+            )
+        )
+        return dialog
+
+    def send_invite(
+        self,
+        extension: str,
+        user_agent: str,
+        *,
+        dialog: SipDialog | None = None,
+    ) -> SipDialog:
+        dialog = dialog or SipDialog.create()
+        self.send(
+            _build_invite(
                 self.host,
                 extension,
                 self.local_ip,
@@ -330,9 +357,58 @@ def _build_options(
     return "\r\n".join(lines)
 
 
+def _build_invite(
+    target_host: str,
+    extension: str,
+    local_ip: str,
+    local_port: int,
+    user_agent: str,
+    *,
+    dialog: SipDialog,
+) -> str:
+    target_uri_host = _format_uri_host(target_host)
+    local_hostport = _format_hostport(local_ip, local_port)
+    addr_type = "IP6" if _is_ipv6_literal(local_ip) else "IP4"
+    media_port = local_port + 1000
+    sdp = "\r\n".join(
+        [
+            "v=0",
+            (
+                f"o=- {random.randint(1000000, 9999999)} "
+                f"{random.randint(1000000, 9999999)} IN {addr_type} {local_ip}"
+            ),
+            "s=DVRTC INVITE enumeration probe",
+            f"c=IN {addr_type} {local_ip}",
+            "t=0 0",
+            f"m=audio {media_port} RTP/AVP 0 8",
+            "a=rtpmap:0 PCMU/8000",
+            "a=rtpmap:8 PCMA/8000",
+            "a=sendrecv",
+            "",
+        ]
+    )
+    lines = [
+        f"INVITE sip:{extension}@{target_uri_host} SIP/2.0",
+        f"Via: SIP/2.0/UDP {local_hostport};branch={dialog.branch};rport",
+        "Max-Forwards: 70",
+        f"To: <sip:{extension}@{target_uri_host}>",
+        f"From: <sip:probe@{target_uri_host}>;tag={dialog.from_tag}",
+        f"Call-ID: {dialog.call_id}",
+        "CSeq: 1 INVITE",
+        f"Contact: <sip:probe@{local_hostport}>",
+        f"User-Agent: {user_agent}",
+        "Content-Type: application/sdp",
+        f"Content-Length: {len(sdp)}",
+        "",
+        sdp,
+    ]
+    return "\r\n".join(lines)
+
+
 def _parse_sip_message(data: bytes) -> SipResponse:
     text = data.decode("utf-8", errors="ignore")
-    lines = text.split("\r\n")
+    header_text, _, body = text.partition("\r\n\r\n")
+    lines = header_text.split("\r\n")
     first_line = lines[0] if lines else ""
     match = SIP_STATUS_RE.match(first_line)
     code = int(match.group(1)) if match else 0
@@ -346,7 +422,7 @@ def _parse_sip_message(data: bytes) -> SipResponse:
         key, value = line.split(":", 1)
         headers[key.strip().lower()] = value.strip()
 
-    return SipResponse(code=code, headers=headers)
+    return SipResponse(code=code, headers=headers, body=body)
 
 
 def _collect_sip_messages(
@@ -417,6 +493,27 @@ def _probe_options(
     with _open_sip_session(host) as session:
         session.send_options(extension, user_agent)
         return session.collect(response_window)
+
+
+def _is_final_invite_response(
+    response: SipResponse,
+    _responses: Sequence[SipResponse],
+) -> bool:
+    return response.code >= 200
+
+
+def _probe_invite(
+    host: str,
+    extension: str,
+    user_agent: str,
+    response_window: float = 3.0,
+) -> list[SipResponse]:
+    with _open_sip_session(host) as session:
+        session.send_invite(extension, user_agent)
+        return session.collect(
+            response_window,
+            stop_when=_is_final_invite_response,
+        )
 
 
 def _parse_digest_challenge(header_value: str) -> dict[str, str]:
@@ -587,6 +684,88 @@ def _sip_codes(responses: Sequence[SipResponse]) -> list[int]:
     return [response.code for response in responses]
 
 
+def _final_sip_response(responses: Sequence[SipResponse]) -> SipResponse | None:
+    for response in reversed(responses):
+        if response.code >= 200:
+            return response
+    return None
+
+
+def _response_has_sdp(response: SipResponse) -> bool:
+    content_type = response.headers.get("content-type", "").lower()
+    return "application/sdp" in content_type or response.body.startswith("v=0")
+
+
+def _classify_invite_responses(responses: Sequence[SipResponse]) -> tuple[str, str]:
+    if not responses:
+        return "no-response", "no SIP response received"
+
+    final_response = _final_sip_response(responses)
+    if final_response is None:
+        return "no-final", "no final SIP response received"
+
+    reason = final_response.headers.get("reason", "")
+    normalized_reason = reason.upper()
+    saw_183_with_sdp = any(
+        response.code == 183 and _response_has_sdp(response)
+        for response in responses
+    )
+
+    if final_response.code == 200:
+        detail = "200 OK"
+        if _response_has_sdp(final_response):
+            detail += " with SDP"
+        return "routable", detail
+
+    if final_response.code == 480 and "USER_NOT_REGISTERED" in normalized_reason:
+        return "known-unregistered", reason
+
+    if final_response.code == 480 and "NORMAL_CLEARING" in normalized_reason:
+        return "invalid", reason
+
+    if final_response.code in {404, 484, 604}:
+        return "invalid", f"final {final_response.code}"
+
+    if final_response.code == 480 and saw_183_with_sdp:
+        return "invalid", reason or "183 Session Progress with SDP before 480"
+
+    return "ambiguous", reason or f"final {final_response.code}"
+
+
+def _expand_extension_spec(spec: str) -> list[str]:
+    expanded: list[str] = []
+    for raw_part in spec.split(","):
+        part = raw_part.strip()
+        if not part:
+            continue
+        range_match = re.fullmatch(r"(\d+)-(\d+)", part)
+        if range_match:
+            start_text, end_text = range_match.groups()
+            start = int(start_text)
+            end = int(end_text)
+            if end < start:
+                raise ValueError(f"invalid descending range '{part}'")
+            width = max(len(start_text), len(end_text))
+            expanded.extend(str(value).zfill(width) for value in range(start, end + 1))
+            continue
+        expanded.append(part)
+    if not expanded:
+        raise ValueError("no extensions specified")
+    return expanded
+
+
+def _parse_invite_expectations(items: Sequence[str]) -> dict[str, str]:
+    expectations: dict[str, str] = {}
+    for item in items:
+        extension, separator, classification = item.partition("=")
+        if not separator or not extension or not classification:
+            raise ValueError(
+                f"invalid expectation '{item}' (expected EXTENSION=CLASSIFICATION)"
+            )
+        expectations[extension.strip()] = classification.strip()
+    return expectations
+
+
 def _run_capture(command: Sequence[str], timeout: float) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         list(command),
@@ -737,6 +916,8 @@ def _run_baresip_session(
     duration: float = 15.0,
     extra_config: str = "",
     dial_uri: str = "",
+    audio_source: str | None = None,
+    extra_modules: Sequence[str] = (),
 ) -> str:
     """Run baresip with a temporary config for a duration and return output."""
     with tempfile.TemporaryDirectory(prefix="dvrtc-baresip-") as tmpdir:
@@ -746,7 +927,7 @@ def _run_baresip_session(
         config_lines = [
             "module_path\t\t/usr/lib/baresip/modules",
             "audio_player\t\taubridge,loopback",
-            "audio_source\t\taubridge,loopback",
+            f"audio_source\t\t{audio_source or 'aubridge,loopback'}",
             "audio_alert\t\taubridge,loopback",
             "video_source",
             "video_display",
@@ -757,6 +938,8 @@ def _run_baresip_session(
             "module\t\t\taubridge.so",
             "module\t\t\tuuid.so",
         ]
+        for module_name in extra_modules:
+            config_lines.append(f"module\t\t\t{module_name}")
         if extra_config:
             config_lines.append(extra_config)
         Path(tmpdir, "config").write_text(
@@ -771,9 +954,29 @@ def _run_baresip_session(
         return _run_for_duration(cmd, duration + 10)
 
 
+def _write_sine_wave(path: Path, *, duration: float, sample_rate: int = 8000) -> None:
+    """Create a short PCM WAV tone that voicemail can record."""
+    total_frames = max(1, int(duration * sample_rate))
+    amplitude = 12000
+    frequency = 440.0
+
+    with wave.open(str(path), "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        for index in range(total_frames):
+            sample = int(amplitude * math.sin(2.0 * math.pi * frequency * index / sample_rate))
+            wav_file.writeframes(struct.pack("<h", sample))
+
+
 def cmd_smoke(args: argparse.Namespace) -> int:
+    scenario = getattr(args, "scenario", os.environ.get("SCENARIO", "pbx1"))
     _info("[*] Smoke: checking TCP reachability")
-    for port in (80, DEFAULT_SIP_PORT, 3478, args.mysql_port):
+    ports = [80, DEFAULT_SIP_PORT]
+    if scenario == "pbx1":
+        ports.extend([3478, args.mysql_port])
+
+    for port in ports:
         try:
             _tcp_connect(args.host, port, timeout=2.0)
         except OSError as exc:
@@ -789,18 +992,19 @@ def cmd_smoke(args: argparse.Namespace) -> int:
         return _fail("HTTP root check did not return expected DVRTC page")
     _info("    [+] HTTP root looks correct")
 
-    _info("[*] Smoke: checking user-agent JSON endpoint")
-    try:
-        status_code, body = _http_get_text(
-            _http_url(args.host, "/logs/useragents/useragents.json"),
-            timeout=5.0,
-        )
-        if status_code != 200:
-            return _fail(f"useragents.json returned HTTP {status_code}")
-        json.loads(body)
-    except (urllib.error.URLError, json.JSONDecodeError) as exc:
-        return _fail(f"useragents.json check failed ({exc})")
-    _info("    [+] useragents.json is reachable and valid JSON")
+    if scenario == "pbx1":
+        _info("[*] Smoke: checking user-agent JSON endpoint")
+        try:
+            status_code, body = _http_get_text(
+                _http_url(args.host, "/logs/useragents/useragents.json"),
+                timeout=5.0,
+            )
+            if status_code != 200:
+                return _fail(f"useragents.json returned HTTP {status_code}")
+            json.loads(body)
+        except (urllib.error.URLError, json.JSONDecodeError) as exc:
+            return _fail(f"useragents.json check failed ({exc})")
+        _info("    [+] useragents.json is reachable and valid JSON")
 
     _info("[*] Smoke: checking basic SIP response")
     responses = _probe_register(args.host, args.extension, "DVRTC-Smoke")
@@ -822,6 +1026,52 @@ def cmd_enum(args: argparse.Namespace) -> int:
     if all(code in {404, 484, 604} for code in codes):
         return _fail(f"Enumeration check failed: extension {args.extension} appears absent")
     _info(f"[+] SIP enumeration confirmed for extension {args.extension}")
+    return 0
+
+
+def cmd_invite_enum(args: argparse.Namespace) -> int:
+    try:
+        extensions = _expand_extension_spec(args.extensions)
+        expectations = _parse_invite_expectations(args.expect)
+    except ValueError as exc:
+        return _fail(f"INVITE enumeration check failed ({exc})")
+
+    _info(f"[*] INVITE enumeration scan against {args.host}")
+    mismatches: list[str] = []
+
+    for extension in extensions:
+        responses = _probe_invite(
+            args.host,
+            extension,
+            "DVRTC-Invite-Enum",
+            args.response_window,
+        )
+        codes = ",".join(str(code) for code in _sip_codes(responses)) or "-"
+        classification, detail = _classify_invite_responses(responses)
+        final_response = _final_sip_response(responses)
+        reason = "-"
+        if final_response is not None:
+            reason = final_response.headers.get("reason", "-")
+        sdp = "yes" if any(_response_has_sdp(response) for response in responses) else "no"
+        _info(
+            "    [+] "
+            f"{extension}: {classification} "
+            f"(codes={codes}; reason={reason}; sdp={sdp}; detail={detail})"
+        )
+
+        expected = expectations.get(extension)
+        if expected and classification != expected:
+            mismatches.append(
+                f"{extension} expected {expected} but saw {classification}"
+            )
+
+    if mismatches:
+        return _fail("INVITE enumeration check failed: " + "; ".join(mismatches))
+
+    if expectations:
+        _info("[+] INVITE enumeration pattern matched expected classifications")
+    else:
+        _info("[+] INVITE enumeration scan completed")
     return 0
 
 
@@ -914,50 +1164,30 @@ def cmd_weak_cred_svcrack(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_log_injection_check(
-    host: str,
-    extension: str,
-    token: str,
-    payload: str,
-    label: str,
-    timeout: float,
-) -> int:
-    _info(f"[*] {label} check: sending malicious User-Agent payload")
-    responses = _probe_register(host, extension, payload)
-    codes = _sip_codes(responses)
-    if not codes:
-        return _fail(f"{label} check failed: no SIP response to REGISTER injection probe")
-    _info(f"    [*] SIP response codes observed: {sorted(set(codes))}")
-
-    _info(f"[*] {label} check: polling logs JSON for payload token")
-    if not _poll_useragents_for_token(host, token, timeout=timeout):
-        return _fail(f"{label} token not found in useragents.json")
-    _info(f"[+] {label} vulnerability confirmed (token {token} observed)")
-    return 0
-
-
 def cmd_sqli(args: argparse.Namespace) -> int:
-    token = f"DVRTC_SQLI_{random.randint(100000, 999999)}"
-    payload = f"leak'), ((SELECT '{token}'))-- "
-    return _run_log_injection_check(
+    return dvrtc_attack_common.run_sqli_check(
         args.host,
         args.extension,
-        token,
-        payload,
-        "SQLi",
         args.timeout,
     )
 
 
-def cmd_xss(args: argparse.Namespace) -> int:
-    token = f"DVRTC_XSS_{random.randint(100000, 999999)}"
-    payload = f'<img src=x onerror=alert("{token}")>'
-    return _run_log_injection_check(
+def cmd_freeswitch_lua_sqli(args: argparse.Namespace) -> int:
+    return dvrtc_attack_common.run_freeswitch_lua_sqli_check(
         args.host,
         args.extension,
-        token,
-        payload,
-        "XSS",
+        target_did=args.target_did,
+        query_did=args.query_did,
+        injected_extension=args.injected_extension,
+        expected_early_media_code=args.expected_early_media_code,
+        response_window=args.response_window,
+    )
+
+
+def cmd_xss(args: argparse.Namespace) -> int:
+    return dvrtc_attack_common.run_xss_check(
+        args.host,
+        args.extension,
         args.timeout,
     )
 
@@ -1079,7 +1309,7 @@ def cmd_offline_crack(args: argparse.Namespace) -> int:
 
 
 def cmd_rtp_bleed(args: argparse.Namespace) -> int:
-    script_path = Path(__file__).with_name("rtpbleed.py")
+    script_path = Path(__file__).resolve().with_name("rtpbleed.py")
     if not script_path.exists():
         return _fail(f"RTP bleed check helper not found at {script_path}")
 
@@ -1181,8 +1411,75 @@ def cmd_bad_auth(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_digestleak_auth(args: argparse.Namespace) -> int:
+    _info("[*] Digestleak-auth: checking that extension 2000 requires auth on loopback")
+    responses = _probe_register(args.host, "2000", "DVRTC-Digestleak-Auth")
+    codes = _sip_codes(responses)
+    if 401 not in codes:
+        return _fail(
+            "Digestleak-auth check failed: unauthenticated REGISTER did not get 401"
+        )
+    _info("    [+] Unauthenticated REGISTER received 401 challenge")
+
+    try:
+        bad_auth_responses = _probe_authenticated_register(
+            args.host, "2000", "wrongpass_dvrtc", args.timeout,
+        )
+    except RuntimeError as exc:
+        return _fail(f"Digestleak-auth check failed ({exc})")
+
+    bad_auth_codes = _sip_codes(bad_auth_responses)
+    if 200 in bad_auth_codes:
+        return _fail("Digestleak-auth check failed: wrong password was accepted")
+    _info(
+        "    [+] Wrong password was rejected "
+        f"(codes: {sorted(set(bad_auth_codes))})"
+    )
+    _info("[+] Digestleak auth check passed")
+    return 0
+
+
+def cmd_digestleak_public_register_blocked(args: argparse.Namespace) -> int:
+    _info("[*] Digestleak-public-register-blocked: checking that extension 2000 cannot register externally")
+    responses = _probe_register(args.host, "2000", "DVRTC-Digestleak-Public")
+    codes = _sip_codes(responses)
+    if 200 in codes:
+        return _fail(
+            "Digestleak-public-register-blocked check failed: unauthenticated REGISTER was accepted"
+        )
+    if codes:
+        _info(
+            "    [+] Unauthenticated REGISTER was not accepted "
+            f"(codes: {sorted(set(codes))})"
+        )
+    else:
+        _info("    [+] Unauthenticated REGISTER did not receive a usable SIP response")
+
+    try:
+        auth_responses = _probe_authenticated_register(
+            args.host, "2000", "2000", args.timeout,
+        )
+    except RuntimeError:
+        _info("    [+] REGISTER with the known password could not proceed because no auth challenge was exposed")
+        _info("[+] External registration for extension 2000 is blocked")
+        return 0
+
+    auth_codes = _sip_codes(auth_responses)
+    if 200 in auth_codes:
+        return _fail(
+            "Digestleak-public-register-blocked check failed: REGISTER with the known password was accepted"
+        )
+    _info(
+        "    [+] REGISTER with the known password was still blocked "
+        f"(codes: {sorted(set(auth_codes)) if auth_codes else 'no response'})"
+    )
+    _info("[+] External registration for extension 2000 is blocked")
+    return 0
+
+
 def cmd_sip_transport(args: argparse.Namespace) -> int:
-    _info("[*] SIP transport check: testing all SIP transports")
+    scenario = getattr(args, "scenario", os.environ.get("SCENARIO", "pbx1"))
+    _info("[*] SIP transport check: testing supported SIP transports")
     results: dict[str, bool] = {}
 
     _info("    [*] Testing UDP/5060")
@@ -1203,13 +1500,20 @@ def cmd_sip_transport(args: argparse.Namespace) -> int:
         results["TCP"] = False
         _info(f"        [!] TCP: connection failed ({exc})")
 
-    _info("    [*] Testing TLS/5061")
+    tls_host = args.host
+    if scenario == "pbx2":
+        normalized_host = _normalize_host(args.host)
+        public_ipv4 = _normalize_host(os.environ.get("PUBLIC_IPV4", "").strip())
+        if normalized_host in {"127.0.0.1", "localhost"} and public_ipv4:
+            tls_host = public_ipv4
+
+    _info(f"    [*] Testing TLS/5061 via {tls_host}")
     try:
         tls_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         tls_ctx.check_hostname = False
         tls_ctx.verify_mode = ssl.CERT_NONE
         tls_responses = _probe_register_tcp(
-            args.host, 5061, args.extension, "DVRTC-Transport-TLS",
+            tls_host, 5061, args.extension, "DVRTC-Transport-TLS",
             transport_name="TLS", ssl_ctx=tls_ctx,
         )
         tls_codes = _sip_codes(tls_responses)
@@ -1219,30 +1523,31 @@ def cmd_sip_transport(args: argparse.Namespace) -> int:
         results["TLS"] = False
         _info(f"        [!] TLS: connection failed ({exc})")
 
-    _info("    [*] Testing WS/8000")
-    try:
-        ws_responses = _probe_register_ws(
-            args.host, 8000, args.extension, "DVRTC-Transport-WS",
-        )
-        ws_codes = _sip_codes(ws_responses)
-        results["WS"] = bool(ws_codes)
-        _info(f"        {'[+]' if ws_codes else '[!]'} WS: {sorted(set(ws_codes)) if ws_codes else 'no response'}")
-    except Exception as exc:
-        results["WS"] = False
-        _info(f"        [!] WS: failed ({exc})")
+    if scenario == "pbx1":
+        _info("    [*] Testing WS/8000")
+        try:
+            ws_responses = _probe_register_ws(
+                args.host, 8000, args.extension, "DVRTC-Transport-WS",
+            )
+            ws_codes = _sip_codes(ws_responses)
+            results["WS"] = bool(ws_codes)
+            _info(f"        {'[+]' if ws_codes else '[!]'} WS: {sorted(set(ws_codes)) if ws_codes else 'no response'}")
+        except Exception as exc:
+            results["WS"] = False
+            _info(f"        [!] WS: failed ({exc})")
 
-    _info("    [*] Testing WSS/8443")
-    try:
-        wss_responses = _probe_register_ws(
-            args.host, 8443, args.extension, "DVRTC-Transport-WSS",
-            secure=True,
-        )
-        wss_codes = _sip_codes(wss_responses)
-        results["WSS"] = bool(wss_codes)
-        _info(f"        {'[+]' if wss_codes else '[!]'} WSS: {sorted(set(wss_codes)) if wss_codes else 'no response'}")
-    except Exception as exc:
-        results["WSS"] = False
-        _info(f"        [!] WSS: failed ({exc})")
+        _info("    [*] Testing WSS/8443")
+        try:
+            wss_responses = _probe_register_ws(
+                args.host, 8443, args.extension, "DVRTC-Transport-WSS",
+                secure=True,
+            )
+            wss_codes = _sip_codes(wss_responses)
+            results["WSS"] = bool(wss_codes)
+            _info(f"        {'[+]' if wss_codes else '[!]'} WSS: {sorted(set(wss_codes)) if wss_codes else 'no response'}")
+        except Exception as exc:
+            results["WSS"] = False
+            _info(f"        [!] WSS: failed ({exc})")
 
     passed = [t for t, ok in results.items() if ok]
     failed = [t for t, ok in results.items() if not ok]
@@ -1382,7 +1687,34 @@ def cmd_callgen_active(args: argparse.Namespace) -> int:
 
 
 def cmd_digestleak_registered(args: argparse.Namespace) -> int:
-    _info("[*] Digestleak-registered: checking if extension 2000 is registered")
+    scenario = getattr(args, "scenario", os.environ.get("SCENARIO", "pbx1"))
+    _info(
+        f"[*] Digestleak-registered: checking if extension 2000 is reachable "
+        f"for scenario {scenario}"
+    )
+
+    if scenario == "pbx2":
+        responses = _probe_invite(
+            args.host,
+            "2000",
+            "DVRTC-Digestleak-Registered",
+            args.response_window,
+        )
+        classification, detail = _classify_invite_responses(responses)
+        codes = _sip_codes(responses)
+        _info(
+            f"    [*] INVITE classification: {classification} "
+            f"(codes={','.join(str(code) for code in codes) or '-'}; detail={detail})"
+        )
+        if classification == "routable":
+            _info("    [+] Extension 2000 answered via the helper-backed path")
+            _info("[+] Digest leak target (ext 2000) is reachable")
+            return 0
+        return _fail(
+            "Digestleak-registered check failed for pbx2: extension 2000 did not "
+            "reach the helper-backed path"
+        )
+
     try:
         output = _run_kamcmd(args.kamcmd_addr, "ul.lookup", "s:location", "s:2000")
     except FileNotFoundError:
@@ -1416,12 +1748,18 @@ def cmd_voicemail(args: argparse.Namespace) -> int:
 
     normalized = _normalize_host(args.host)
     account = f"<sip:1000@{normalized};transport=udp>;auth_pass=1500;regint=0"
-    _info("    [*] Calling extension 1100 via baresip")
-    _run_baresip_session(
-        account,
-        duration=args.duration,
-        dial_uri=f"sip:1100@{normalized}",
-    )
+    with tempfile.TemporaryDirectory(prefix="dvrtc-voicemail-tone-") as tmpdir:
+        tone_path = Path(tmpdir, "tone.wav")
+        _write_sine_wave(tone_path, duration=max(8.0, args.duration))
+
+        _info("    [*] Calling extension 1100 via baresip")
+        _run_baresip_session(
+            account,
+            duration=args.duration,
+            dial_uri=f"sip:1100@{normalized}",
+            audio_source=f"aufile,{tone_path}",
+            extra_modules=("aufile.so",),
+        )
     _info("    [*] Baresip call completed, waiting for voicemail processing")
     time.sleep(10)
 
@@ -1446,17 +1784,34 @@ def cmd_voicemail(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="DVRTC smoke and vulnerability checks")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    scenario_default = os.environ.get("SCENARIO", "pbx1")
 
     smoke = subparsers.add_parser("smoke", help="Run baseline smoke checks")
     smoke.add_argument("--host", default="127.0.0.1")
     smoke.add_argument("--mysql-port", type=int, default=23306)
     smoke.add_argument("--extension", default="1000")
+    smoke.add_argument("--scenario", choices=("pbx1", "pbx2"), default=scenario_default)
     smoke.set_defaults(func=cmd_smoke)
 
     enum = subparsers.add_parser("enum", help="Check SIP extension enumeration")
     enum.add_argument("--host", default="127.0.0.1")
     enum.add_argument("--extension", default="2000")
     enum.set_defaults(func=cmd_enum)
+
+    invite_enum = subparsers.add_parser(
+        "invite-enum",
+        help="Enumerate extension classes via unauthenticated SIP INVITE responses",
+    )
+    invite_enum.add_argument("--host", default="127.0.0.1")
+    invite_enum.add_argument("--extensions", default=INVITE_ENUM_DEFAULT_EXTENSIONS)
+    invite_enum.add_argument(
+        "--expect",
+        action="append",
+        default=[],
+        help="Assert EXTENSION=CLASSIFICATION for a scanned extension",
+    )
+    invite_enum.add_argument("--response-window", type=float, default=3.0)
+    invite_enum.set_defaults(func=cmd_invite_enum)
 
     weak_cred = subparsers.add_parser("weak-cred", help="Check weak SIP credentials")
     weak_cred.add_argument("--host", default="127.0.0.1")
@@ -1485,6 +1840,27 @@ def build_parser() -> argparse.ArgumentParser:
     sqli.add_argument("--extension", default="1000")
     sqli.add_argument("--timeout", type=float, default=15.0)
     sqli.set_defaults(func=cmd_sqli)
+
+    freeswitch_lua_sqli = subparsers.add_parser(
+        "freeswitch-lua-sqli",
+        help="Check the FreeSWITCH Lua freeswitch.Dbh SQL injection demo",
+    )
+    freeswitch_lua_sqli.add_argument("--host", default="127.0.0.1")
+    freeswitch_lua_sqli.add_argument("--extension", default=FREESWITCH_LUA_SQLI_EXTENSION)
+    freeswitch_lua_sqli.add_argument("--target-did", default="9000")
+    freeswitch_lua_sqli.add_argument(
+        "--query-did",
+        default="",
+        help="Query the DID mapping for this value instead of querying the mapping for --target-did",
+    )
+    freeswitch_lua_sqli.add_argument("--expected-early-media-code", type=int, default=183)
+    freeswitch_lua_sqli.add_argument(
+        "--injected-extension",
+        default="",
+        help="Override the injected called SIP URI user part",
+    )
+    freeswitch_lua_sqli.add_argument("--response-window", type=float, default=4.0)
+    freeswitch_lua_sqli.set_defaults(func=cmd_freeswitch_lua_sqli)
 
     xss = subparsers.add_parser("xss", help="Check SIP->XSS payload path")
     xss.add_argument("--host", default="127.0.0.1")
@@ -1545,6 +1921,7 @@ def build_parser() -> argparse.ArgumentParser:
     sip_transport = subparsers.add_parser("sip-transport", help="Check SIP over all transports")
     sip_transport.add_argument("--host", default="127.0.0.1")
     sip_transport.add_argument("--extension", default="1000")
+    sip_transport.add_argument("--scenario", choices=("pbx1", "pbx2"), default=scenario_default)
     sip_transport.set_defaults(func=cmd_sip_transport)
 
     wss_register = subparsers.add_parser("wss-register", help="Check authenticated REGISTER over WSS")
@@ -1557,11 +1934,28 @@ def build_parser() -> argparse.ArgumentParser:
     callgen_active.set_defaults(func=cmd_callgen_active)
 
     digestleak_reg = subparsers.add_parser(
-        "digestleak-registered", help="Check extension 2000 is registered",
+        "digestleak-registered", help="Check extension 2000 is reachable through the digest-leak helper path",
     )
     digestleak_reg.add_argument("--host", default="127.0.0.1")
     digestleak_reg.add_argument("--kamcmd-addr", default="tcp:127.0.0.1:2046")
+    digestleak_reg.add_argument("--scenario", choices=("pbx1", "pbx2"), default=scenario_default)
+    digestleak_reg.add_argument("--response-window", type=float, default=3.0)
     digestleak_reg.set_defaults(func=cmd_digestleak_registered)
+
+    digestleak_auth = subparsers.add_parser(
+        "digestleak-auth", help="Check extension 2000 requires auth on REGISTER",
+    )
+    digestleak_auth.add_argument("--host", default="127.0.0.1")
+    digestleak_auth.add_argument("--timeout", type=float, default=5.0)
+    digestleak_auth.set_defaults(func=cmd_digestleak_auth)
+
+    digestleak_public_block = subparsers.add_parser(
+        "digestleak-public-register-blocked",
+        help="Check extension 2000 cannot be registered from a non-loopback vantage",
+    )
+    digestleak_public_block.add_argument("--host", default="127.0.0.1")
+    digestleak_public_block.add_argument("--timeout", type=float, default=5.0)
+    digestleak_public_block.set_defaults(func=cmd_digestleak_public_register_blocked)
 
     voicemail = subparsers.add_parser("voicemail", help="Check voicemail by calling extension 1100")
     voicemail.add_argument("--host", default="127.0.0.1")

@@ -1,0 +1,88 @@
+<context name="default">
+
+  <!-- Extension 1000 - dial endpoint (password cracking demo) -->
+  <extension name="1000">
+    <condition field="destination_number" expression="^1000$">
+      <action application="log" data="INFO User ${caller_id_number} calling extension 1000"/>
+      <action application="bridge" data="user/1000@default"/>
+    </condition>
+  </extension>
+
+  <!-- Extension 1200 - Echo test -->
+  <extension name="1200">
+    <condition field="destination_number" expression="^1200$">
+      <action application="log" data="INFO User ${caller_id_number} calling echo service at 1200"/>
+      <action application="answer"/>
+      <action application="echo"/>
+    </condition>
+  </extension>
+
+  <!-- Extension 2001 - FreeSWITCH Lua SQL injection demo -->
+  <extension name="2001-lua-sqli-lookup" continue="true">
+    <condition field="destination_number" expression="^2001.*$">
+      <!-- INTENTIONALLY VULNERABLE: ${sip_invite_req_uri} / ${destination_number} is read by a Lua freeswitch.Dbh query without escaping -->
+      <action inline="true" application="lua" data="/opt/freeswitch/scripts/map_did_to_route.lua"/>
+    </condition>
+  </extension>
+
+  <extension name="2001-lua-sqli-dispatch-public">
+    <condition field="${route_target}:${route_scope}:${lua_lookup_done}" expression="^[^:]+:public:$">
+      <action application="set" data="lua_lookup_done=1"/>
+      <action application="log" data="INFO Lua DID dispatch sent ${caller_id_number} to public target ${route_target}"/>
+      <action application="transfer" data="${route_target} XML default"/>
+    </condition>
+  </extension>
+
+  <extension name="2001-lua-sqli-dispatch-internal">
+    <condition field="${route_target}:${route_scope}:${lua_lookup_done}" expression="^[^:]+:internal:$">
+      <action application="set" data="lua_lookup_done=1"/>
+      <action application="set" data="lua_internal_access=1"/>
+      <action application="log" data="WARNING Lua SQLi DID mapping redirected ${caller_id_number} to internal target ${route_target}"/>
+      <action application="transfer" data="${route_target} XML default"/>
+    </condition>
+  </extension>
+
+  <!-- Extension 2001 - HAL public service reached through the vulnerable lookup -->
+  <extension name="2001-hal-public-service">
+    <condition field="destination_number" expression="^2001$">
+      <action application="answer"/>
+      <action application="sleep" data="350"/>
+      <action application="playback" data="en/us/callie/dvrtc/8000/hal_intro.wav"/>
+      <action application="sleep" data="1400"/>
+      <action application="playback" data="en/us/callie/dvrtc/8000/hal_quote_1.wav"/>
+      <action application="sleep" data="350"/>
+      <action application="hangup"/>
+    </condition>
+  </extension>
+
+  <!-- Extension 9000 - Internal-only HAL backdoor unlocked by Lua SQLi -->
+  <extension name="9000-hal-backdoor">
+    <condition field="${destination_number}:${lua_internal_access}" expression="^9000:1$">
+      <action application="log" data="WARNING Internal HAL backdoor extension 9000 reached through Lua DID lookup"/>
+      <action application="pre_answer"/>
+      <action application="answer"/>
+      <action application="sleep" data="350"/>
+      <action application="playback" data="en/us/callie/dvrtc/8000/hal_access_granted.wav"/>
+      <action application="sleep" data="350"/>
+      <action application="hangup"/>
+    </condition>
+  </extension>
+
+  <!-- Extension 1300 - Echo for callgen (silent answer, used for RTP bleed) -->
+  <extension name="1300">
+    <condition field="destination_number" expression="^1300$">
+      <action application="answer"/>
+      <action application="echo"/>
+    </condition>
+  </extension>
+
+  <!-- Catch-all for invalid extensions -->
+  <extension name="invalid">
+    <condition field="destination_number" expression="^(.*)$">
+      <action application="log" data="WARNING User ${caller_id_number} dialed invalid number ${destination_number}"/>
+      <action application="playback" data="ivr/ivr-invalid_extension.wav"/>
+      <action application="hangup"/>
+    </condition>
+  </extension>
+
+</context>

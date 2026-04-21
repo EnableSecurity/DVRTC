@@ -1,0 +1,90 @@
+services:
+  freeswitch:
+    build:
+      context: build/freeswitch
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: pbx2-freeswitch
+        VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
+
+  rtpproxy:
+    build:
+      context: build/rtpproxy
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: pbx2-rtpproxy
+        VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
+
+  opensips:
+    build:
+      context: build/opensips
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: pbx2-opensips
+        VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
+
+  baresip-callgen-pbx2:
+    build:
+      context: build/baresip-callgen
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: baresip-callgen
+        VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
+
+  baresip-callgen-b-pbx2:
+    build:
+      context: build/baresip-callgen
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: baresip-callgen
+        VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
+
+  baresip-callgen-c-pbx2:
+    build:
+      context: build/baresip-callgen
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: baresip-callgen
+        VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
+
+  baresip-digestleak-pbx2:
+    build:
+      context: build/baresip-digestleak
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: baresip-digestleak
+        VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
+
+  nginx-pbx2:
+    build:
+      context: build/nginx
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: nginx
+        VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
+
+  voicemailcleaner-pbx2:
+    build:
+      context: build/voicemailcleaner
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: voicemailcleaner
+        VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}
+
+  recordingscleaner:
+    build:
+      context: build/voicemailcleaner
+      args:
+        DVRTC_VERSION: ${DVRTC_VERSION:-dev}
+        DVRTC_SERVICE: voicemailcleaner
+        VCS_REF: ${VCS_REF:-unknown}
+        DVRTC_SOURCE: ${DVRTC_SOURCE:-https://github.com/EnableSecurity/DVRTC}

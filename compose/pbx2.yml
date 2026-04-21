@@ -1,0 +1,230 @@
+# DVRTC pbx2 scenario - OpenSIPS, FreeSWITCH, rtpproxy
+
+x-logging:
+  &default-logging
+  options:
+    max-size: '12m'
+    max-file: '5'
+  driver: local
+
+x-required-public-ipv4:
+  &required-public-ipv4
+  PUBLIC_IPV4: "${PUBLIC_IPV4:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before starting a scenario with './scripts/compose.sh --scenario pbx1 up -d' or './scripts/compose.sh --scenario pbx2 up -d'. See README.md Initial Setup.}"
+
+x-required-sipcaller-password:
+  &required-sipcaller-password
+  SIPCALLER1_PASSWORD: "${SIPCALLER1_PASSWORD:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before starting a scenario with './scripts/compose.sh --scenario pbx1 up -d' or './scripts/compose.sh --scenario pbx2 up -d'. See README.md Initial Setup.}"
+
+services:
+  # FreeSWITCH PBX - Backend call processing for pbx2
+  # INTENTIONALLY VULNERABLE: Weak password (1000:1500), Lua SQLi demo on 2001 with hidden 9000 access, no rate limiting
+  freeswitch:
+    image: ghcr.io/enablesecurity/dvrtc/pbx2-freeswitch:v0.2.0
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    environment:
+      <<: [*required-public-ipv4, *required-sipcaller-password]
+    volumes:
+      - type: bind
+        source: ./data/certs
+        target: /etc/certstore
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    network_mode: "host"
+    healthcheck:
+      test: ["CMD", "freeswitch-healthcheck"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 60s
+
+  # rtpproxy - Media proxy with unconditional RTP recording for pbx2
+  rtpproxy:
+    image: ghcr.io/enablesecurity/dvrtc/pbx2-rtpproxy:v0.2.0
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      <<: *required-public-ipv4
+      PUBLIC_IPV6: ${PUBLIC_IPV6:-}
+    volumes:
+      - type: volume
+        source: rtp-recordings
+        target: /recordings
+    healthcheck:
+      test: ["CMD", "rtpproxy-healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # OpenSIPS - SIP proxy/registrar for pbx2
+  # INTENTIONALLY VULNERABLE: Distinct INVITE outcomes leak extension state; extension 2000 digest leak behavior
+  opensips:
+    image: ghcr.io/enablesecurity/dvrtc/pbx2-opensips:v0.2.0
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    depends_on:
+      rtpproxy:
+        condition: service_healthy
+      freeswitch:
+        condition: service_healthy
+    network_mode: "host"
+    healthcheck:
+      test: ["CMD", "opensips-healthcheck"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 20s
+    environment:
+      <<: *required-public-ipv4
+      PUBLIC_IPV6: "${PUBLIC_IPV6:-}"
+      EMAIL: "${EMAIL:-}"
+      DOMAIN: "${DOMAIN:-}"
+    volumes:
+      - type: bind
+        source: ./data/certs
+        target: /etc/certstore
+
+  baresip-callgen-pbx2:
+    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.2.0
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      SIPCALLER1_PASSWORD: "${SIPCALLER1_PASSWORD:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before starting a scenario with './scripts/compose.sh --scenario pbx1 up -d' or './scripts/compose.sh --scenario pbx2 up -d'. See README.md Initial Setup.}"
+      CALL_DEST: 1300
+      CALL_DURATION: 20
+      CALL_PAUSE: 0
+      CALL_START_DELAY: 0
+    depends_on:
+      opensips:
+        condition: service_healthy
+        restart: true
+      freeswitch:
+        condition: service_healthy
+        restart: true
+
+  baresip-callgen-b-pbx2:
+    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.2.0
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      SIPCALLER1_PASSWORD: "${SIPCALLER1_PASSWORD:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before starting a scenario with './scripts/compose.sh --scenario pbx1 up -d' or './scripts/compose.sh --scenario pbx2 up -d'. See README.md Initial Setup.}"
+      CALL_DEST: 1300
+      CALL_DURATION: 20
+      CALL_PAUSE: 0
+      CALL_START_DELAY: 8
+    depends_on:
+      opensips:
+        condition: service_healthy
+        restart: true
+      freeswitch:
+        condition: service_healthy
+        restart: true
+
+  baresip-callgen-c-pbx2:
+    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.2.0
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      SIPCALLER1_PASSWORD: "${SIPCALLER1_PASSWORD:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before starting a scenario with './scripts/compose.sh --scenario pbx1 up -d' or './scripts/compose.sh --scenario pbx2 up -d'. See README.md Initial Setup.}"
+      CALL_DEST: 1300
+      CALL_DURATION: 20
+      CALL_PAUSE: 0
+      CALL_START_DELAY: 16
+    depends_on:
+      opensips:
+        condition: service_healthy
+        restart: true
+      freeswitch:
+        condition: service_healthy
+        restart: true
+
+  baresip-digestleak-pbx2:
+    image: ghcr.io/enablesecurity/dvrtc/baresip-digestleak:v0.2.0
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    network_mode: "host"
+    depends_on:
+      opensips:
+        condition: service_healthy
+        restart: true
+
+  nginx-pbx2:
+    image: ghcr.io/enablesecurity/dvrtc/nginx:v0.2.0
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - type: volume
+        source: rtp-recordings
+        target: /var/www/html/recordings
+      - type: volume
+        source: acme-challenge
+        target: /var/www/html/.well-known/acme-challenge
+      - type: bind
+        source: ./data/certs
+        target: /etc/certstore
+    environment:
+      <<: *required-public-ipv4
+      EMAIL: "${EMAIL:-}"
+      DOMAIN: "${DOMAIN:-}"
+      PUBLIC_IPV6: "${PUBLIC_IPV6:-}"
+      DVRTC_NGINX_SCENARIO: pbx2
+    healthcheck:
+      test: ["CMD", "nginx-healthcheck"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 10s
+
+  recordingscleaner:
+    image: ghcr.io/enablesecurity/dvrtc/voicemailcleaner:v0.2.0
+    platform: linux/amd64
+    logging: *default-logging
+    restart: unless-stopped
+    user: "15004:15004"
+    environment:
+      CLEAN_PATH: /recordings
+      CLEAN_MODE: flat-subdirs
+      CLEAN_SUBDIRS: ""
+      MAX_FILE_AGE: 1800
+      MAX_FILE_COUNT: 300
+      CLEAN_LOG_LEVEL: WARNING
+    volumes:
+      - type: volume
+        source: rtp-recordings
+        target: /recordings
+    depends_on:
+      - rtpproxy
+    network_mode: "none"
+
+  # Certbot - LetsEncrypt certificate automation
+  certbot:
+    logging: *default-logging
+    restart: unless-stopped
+    image: certbot/certbot:v5.4.0
+    volumes:
+      - type: volume
+        source: acme-challenge
+        target: /var/www/html/.well-known/acme-challenge
+      - type: bind
+        source: ./data/certs
+        target: /etc/certstore
+    environment:
+      - EMAIL
+      - DOMAIN
+    entrypoint: "/bin/sh -c 'trap exit TERM; if [ -z \"$DOMAIN\" ]; then echo \"No domain specified, certbot will not run\"; sleep infinity; fi; while :; do certbot certonly -n -d $DOMAIN --agree-tos --webroot -w /var/www/html --email $EMAIL --deploy-hook \"owner=$$(stat -c %u:%g /etc/certstore) && cp /etc/letsencrypt/live/$DOMAIN/* /etc/certstore && chown $$owner /etc/certstore/* && chmod 644 /etc/certstore/fullchain.pem /etc/certstore/privkey.pem\"; sleep 12h & wait $${!}; done;'"

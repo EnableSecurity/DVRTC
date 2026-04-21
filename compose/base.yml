@@ -1,0 +1,50 @@
+# DVRTC - Damn Vulnerable Real-Time Communications
+# WARNING: This system is INTENTIONALLY VULNERABLE - deploy only on dedicated hosts with no production systems
+#
+# This is the shared base compose file. Use it together with either:
+#   - compose/pbx1.yml
+#   - compose/pbx2.yml
+# or prefer the wrapper scripts:
+#   - ./scripts/compose.sh
+#   - ./scripts/dev-compose.sh
+
+services:
+  # Testing runner - one-off host-local capture, diagnostics, and regression checks
+  # Use with: docker compose -f compose/base.yml -f compose/<scenario>.yml run --rm testing ...
+  testing:
+    image: ghcr.io/enablesecurity/dvrtc/testing:v0.2.0
+    platform: linux/amd64
+    network_mode: "host"
+    privileged: true
+    environment:
+      PUBLIC_IPV4: "${PUBLIC_IPV4:-}"
+      PUBLIC_IPV6: "${PUBLIC_IPV6:-}"
+    volumes:
+      - type: bind
+        source: ./artifacts
+        target: /work
+    profiles:
+      - testing
+
+  # Attacker runner - one-off bridge-networked remote attack vantage point
+  # Use with: docker compose -f compose/base.yml -f compose/<scenario>.yml run --rm attacker ...
+  attacker:
+    image: ghcr.io/enablesecurity/dvrtc/testing:v0.2.0
+    platform: linux/amd64
+    environment:
+      PUBLIC_IPV4: "${PUBLIC_IPV4:-}"
+      PUBLIC_IPV6: "${PUBLIC_IPV6:-}"
+    volumes:
+      - type: bind
+        source: ./artifacts
+        target: /work
+    profiles:
+      - testing
+
+volumes:
+  voicemail:      # Voicemail storage for pbx1 extension 1100
+  voicemail-pbx2: # Voicemail storage for pbx2 extension 1100
+  acme-challenge: # LetsEncrypt ACME challenge directory
+  wwwlog:         # User-Agent tracking logs
+  mysqlsock:      # MySQL Unix socket for IPC
+  rtp-recordings: # rtpproxy packet captures for pbx2

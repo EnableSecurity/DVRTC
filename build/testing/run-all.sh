@@ -29,17 +29,23 @@ TARGET_IP="$(normalize_host "${TARGET_INPUT}")"
 TARGET_SIP_HOST="$(format_uri_host "${TARGET_INPUT}")"
 DIGEST_EXT="2000"
 TARGET_MYSQL_PORT="${2:-${MYSQL_PORT:-23306}}"
+SCENARIO="${SCENARIO:-pbx1}"
 
 SMOKE_EXT="${SMOKE_EXT:-1000}"
 ENUM_EXT="${ENUM_EXT:-${DIGEST_EXT}}"
+PBX2_ENUM_ROUTABLE_EXT="${PBX2_ENUM_ROUTABLE_EXT:-1200}"
+PBX2_ENUM_UNREGISTERED_EXT="${PBX2_ENUM_UNREGISTERED_EXT:-1000}"
+PBX2_ENUM_INVALID_EXT="${PBX2_ENUM_INVALID_EXT:-9999}"
 WEAK_USER="${WEAK_USER:-1000}"
 WEAK_PASS="${WEAK_PASS:-1500}"
 
 RUN_SMOKE_CHECK="${RUN_SMOKE_CHECK:-1}"
-RUN_TURN_CHECK="${RUN_TURN_CHECK:-1}"
+RUN_TURN_CHECK="${RUN_TURN_CHECK:-}"
 RUN_RTP_BLEED_CHECK="${RUN_RTP_BLEED_CHECK:-1}"
+RUN_RTP_FLOOD_CHECK="${RUN_RTP_FLOOD_CHECK:-}"
 RUN_SIP_FLOOD_CHECK="${RUN_SIP_FLOOD_CHECK:-1}"
 RUN_OFFLINE_CRACK_CHECK="${RUN_OFFLINE_CRACK_CHECK:-1}"
+RUN_FREESWITCH_LUA_SQLI_CHECK="${RUN_FREESWITCH_LUA_SQLI_CHECK:-}"
 
 WEAK_CRED_TIMEOUT="${WEAK_CRED_TIMEOUT:-25}"
 SQLI_TIMEOUT="${SQLI_TIMEOUT:-20}"
@@ -59,21 +65,51 @@ RTP_BLEED_CYCLE_LISTEN="${RTP_BLEED_CYCLE_LISTEN:-0.05}"
 RTP_BLEED_LISTEN="${RTP_BLEED_LISTEN:-1.0}"
 RTP_BLEED_PAYLOAD_TYPE="${RTP_BLEED_PAYLOAD_TYPE:-0}"
 RTP_BLEED_ATTEMPTS="${RTP_BLEED_ATTEMPTS:-3}"
+RTP_FLOOD_EXT="${RTP_FLOOD_EXT:-1200}"
+RTP_FLOOD_RECORDINGS_HOST="${RTP_FLOOD_RECORDINGS_HOST:-${TARGET_IP}}"
+RTP_FLOOD_DURATION="${RTP_FLOOD_DURATION:-3.0}"
+RTP_FLOOD_PACKET_RATE="${RTP_FLOOD_PACKET_RATE:-1000}"
+RTP_FLOOD_PAYLOAD_SIZE="${RTP_FLOOD_PAYLOAD_SIZE:-1200}"
+RTP_FLOOD_PAYLOAD_TYPE="${RTP_FLOOD_PAYLOAD_TYPE:-0}"
+RTP_FLOOD_MIN_RECORDING_GROWTH="${RTP_FLOOD_MIN_RECORDING_GROWTH:-1048576}"
+RTP_FLOOD_RECORDING_SETTLE="${RTP_FLOOD_RECORDING_SETTLE:-5.0}"
+RTP_FLOOD_POST_FLOOD_LINGER="${RTP_FLOOD_POST_FLOOD_LINGER:-0.5}"
+RTP_FLOOD_RESPONSE_WINDOW="${RTP_FLOOD_RESPONSE_WINDOW:-8.0}"
 
 RUN_REGISTER_CHECK="${RUN_REGISTER_CHECK:-1}"
 RUN_BAD_AUTH_CHECK="${RUN_BAD_AUTH_CHECK:-1}"
+RUN_DIGESTLEAK_AUTH_CHECK="${RUN_DIGESTLEAK_AUTH_CHECK:-}"
+RUN_DIGESTLEAK_PUBLIC_BLOCK_CHECK="${RUN_DIGESTLEAK_PUBLIC_BLOCK_CHECK:-0}"
 RUN_TRANSPORT_CHECK="${RUN_TRANSPORT_CHECK:-1}"
-RUN_WSS_REGISTER_CHECK="${RUN_WSS_REGISTER_CHECK:-1}"
-RUN_CALLGEN_CHECK="${RUN_CALLGEN_CHECK:-1}"
-RUN_DIGESTLEAK_REG_CHECK="${RUN_DIGESTLEAK_REG_CHECK:-1}"
-RUN_VOICEMAIL_CHECK="${RUN_VOICEMAIL_CHECK:-1}"
+case "${SCENARIO}" in
+    pbx2)
+        RUN_TURN_CHECK="${RUN_TURN_CHECK:-0}"
+        RUN_WSS_REGISTER_CHECK="${RUN_WSS_REGISTER_CHECK:-0}"
+        RUN_CALLGEN_CHECK="${RUN_CALLGEN_CHECK:-0}"
+        RUN_DIGESTLEAK_REG_CHECK="${RUN_DIGESTLEAK_REG_CHECK:-0}"
+        RUN_DIGESTLEAK_AUTH_CHECK="${RUN_DIGESTLEAK_AUTH_CHECK:-1}"
+        RUN_VOICEMAIL_CHECK="${RUN_VOICEMAIL_CHECK:-0}"
+        RUN_RTP_FLOOD_CHECK="${RUN_RTP_FLOOD_CHECK:-1}"
+        RUN_FREESWITCH_LUA_SQLI_CHECK="${RUN_FREESWITCH_LUA_SQLI_CHECK:-1}"
+        ;;
+    *)
+        RUN_TURN_CHECK="${RUN_TURN_CHECK:-1}"
+        RUN_WSS_REGISTER_CHECK="${RUN_WSS_REGISTER_CHECK:-1}"
+        RUN_CALLGEN_CHECK="${RUN_CALLGEN_CHECK:-1}"
+        RUN_DIGESTLEAK_REG_CHECK="${RUN_DIGESTLEAK_REG_CHECK:-1}"
+        RUN_DIGESTLEAK_AUTH_CHECK="${RUN_DIGESTLEAK_AUTH_CHECK:-0}"
+        RUN_VOICEMAIL_CHECK="${RUN_VOICEMAIL_CHECK:-1}"
+        RUN_RTP_FLOOD_CHECK="${RUN_RTP_FLOOD_CHECK:-0}"
+        ;;
+esac
 KAMCMD_ADDR="${KAMCMD_ADDR:-tcp:127.0.0.1:2046}"
-VOICEMAIL_DURATION="${VOICEMAIL_DURATION:-10}"
+VOICEMAIL_DURATION="${VOICEMAIL_DURATION:-18}"
 
 if [ "${RUN_SMOKE_CHECK}" = "1" ]; then
     echo "[*] Running baseline smoke checks"
     python3 /opt/testing/scripts/dvrtc-checks.py \
         smoke \
+        --scenario "${SCENARIO}" \
         --host "${TARGET_IP}" \
         --extension "${SMOKE_EXT}" \
         --mysql-port "${TARGET_MYSQL_PORT}"
@@ -108,6 +144,7 @@ if [ "${RUN_TRANSPORT_CHECK}" = "1" ]; then
     echo "[*] Running SIP transport check"
     python3 /opt/testing/scripts/dvrtc-checks.py \
         sip-transport \
+        --scenario "${SCENARIO}" \
         --host "${TARGET_IP}"
 else
     echo "[*] Skipping SIP transport check (RUN_TRANSPORT_CHECK=${RUN_TRANSPORT_CHECK})"
@@ -136,9 +173,30 @@ if [ "${RUN_DIGESTLEAK_REG_CHECK}" = "1" ]; then
     python3 /opt/testing/scripts/dvrtc-checks.py \
         digestleak-registered \
         --host "${TARGET_IP}" \
+        --scenario "${SCENARIO}" \
         --kamcmd-addr "${KAMCMD_ADDR}"
 else
     echo "[*] Skipping digestleak-registered check (RUN_DIGESTLEAK_REG_CHECK=${RUN_DIGESTLEAK_REG_CHECK})"
+fi
+
+if [ "${RUN_DIGESTLEAK_AUTH_CHECK}" = "1" ]; then
+    echo "[*] Running digestleak-auth check"
+    python3 /opt/testing/scripts/dvrtc-checks.py \
+        digestleak-auth \
+        --host "${TARGET_IP}" \
+        --timeout "${WEAK_CRED_TIMEOUT}"
+else
+    echo "[*] Skipping digestleak-auth check (RUN_DIGESTLEAK_AUTH_CHECK=${RUN_DIGESTLEAK_AUTH_CHECK})"
+fi
+
+if [ "${RUN_DIGESTLEAK_PUBLIC_BLOCK_CHECK}" = "1" ]; then
+    echo "[*] Running digestleak-public-register-blocked check"
+    python3 /opt/testing/scripts/dvrtc-checks.py \
+        digestleak-public-register-blocked \
+        --host "${TARGET_IP}" \
+        --timeout "${WEAK_CRED_TIMEOUT}"
+else
+    echo "[*] Skipping digestleak-public-register-blocked check (RUN_DIGESTLEAK_PUBLIC_BLOCK_CHECK=${RUN_DIGESTLEAK_PUBLIC_BLOCK_CHECK})"
 fi
 
 if [ "${RUN_VOICEMAIL_CHECK}" = "1" ]; then
@@ -151,11 +209,22 @@ else
     echo "[*] Skipping voicemail check (RUN_VOICEMAIL_CHECK=${RUN_VOICEMAIL_CHECK})"
 fi
 
-echo "[*] Running enumeration check against ${TARGET_SIP_HOST}:${ENUM_EXT}"
-python3 /opt/testing/scripts/dvrtc-checks.py \
-    enum \
-    --host "${TARGET_IP}" \
-    --extension "${ENUM_EXT}"
+if [ "${SCENARIO}" = "pbx2" ]; then
+    echo "[*] Running INVITE enumeration check against ${TARGET_SIP_HOST}"
+    python3 /opt/testing/scripts/dvrtc-checks.py \
+        invite-enum \
+        --host "${TARGET_IP}" \
+        --extensions "${PBX2_ENUM_ROUTABLE_EXT},${PBX2_ENUM_UNREGISTERED_EXT},${PBX2_ENUM_INVALID_EXT}" \
+        --expect "${PBX2_ENUM_ROUTABLE_EXT}=routable" \
+        --expect "${PBX2_ENUM_UNREGISTERED_EXT}=known-unregistered" \
+        --expect "${PBX2_ENUM_INVALID_EXT}=invalid"
+else
+    echo "[*] Running enumeration check against ${TARGET_SIP_HOST}:${ENUM_EXT}"
+    python3 /opt/testing/scripts/dvrtc-checks.py \
+        enum \
+        --host "${TARGET_IP}" \
+        --extension "${ENUM_EXT}"
+fi
 
 echo "[*] Running weak credential check"
 python3 /opt/testing/scripts/dvrtc-checks.py \
@@ -165,19 +234,29 @@ python3 /opt/testing/scripts/dvrtc-checks.py \
     --password "${WEAK_PASS}" \
     --timeout "${WEAK_CRED_TIMEOUT}"
 
-echo "[*] Running SIP -> SQLi check"
-python3 /opt/testing/scripts/dvrtc-checks.py \
+if [ "${SCENARIO}" = "pbx1" ]; then
+    echo "[*] Running SIP -> SQLi check"
     sqli \
-    --host "${TARGET_IP}" \
-    --extension "${SMOKE_EXT}" \
-    --timeout "${SQLI_TIMEOUT}"
+        --host "${TARGET_IP}" \
+        --extension "${SMOKE_EXT}" \
+        --timeout "${SQLI_TIMEOUT}"
 
-echo "[*] Running SIP -> XSS path check"
-python3 /opt/testing/scripts/dvrtc-checks.py \
+    echo "[*] Running SIP -> XSS path check"
     xss \
-    --host "${TARGET_IP}" \
-    --extension "${SMOKE_EXT}" \
-    --timeout "${XSS_TIMEOUT}"
+        --host "${TARGET_IP}" \
+        --extension "${SMOKE_EXT}" \
+        --timeout "${XSS_TIMEOUT}"
+else
+    echo "[*] Skipping SQLi/XSS checks for scenario ${SCENARIO}"
+fi
+
+if [ "${RUN_FREESWITCH_LUA_SQLI_CHECK}" = "1" ]; then
+    echo "[*] Running FreeSWITCH Lua SQLi check"
+    freeswitch-lua-sqli \
+        --host "${TARGET_IP}"
+else
+    echo "[*] Skipping FreeSWITCH Lua SQLi check (RUN_FREESWITCH_LUA_SQLI_CHECK=${RUN_FREESWITCH_LUA_SQLI_CHECK})"
+fi
 
 echo "[*] Running digest leak check"
 
@@ -306,6 +385,24 @@ if [ "${RUN_RTP_BLEED_CHECK}" = "1" ]; then
     fi
 else
     echo "[*] Skipping RTP bleed check (RUN_RTP_BLEED_CHECK=${RUN_RTP_BLEED_CHECK})"
+fi
+
+if [ "${RUN_RTP_FLOOD_CHECK}" = "1" ]; then
+    echo "[*] Running RTP flood check"
+    python3 /opt/testing/scripts/rtpflood.py \
+        --host "${TARGET_IP}" \
+        --recordings-host "${RTP_FLOOD_RECORDINGS_HOST}" \
+        --extension "${RTP_FLOOD_EXT}" \
+        --duration "${RTP_FLOOD_DURATION}" \
+        --packet-rate "${RTP_FLOOD_PACKET_RATE}" \
+        --payload-size "${RTP_FLOOD_PAYLOAD_SIZE}" \
+        --payload-type "${RTP_FLOOD_PAYLOAD_TYPE}" \
+        --min-recording-growth "${RTP_FLOOD_MIN_RECORDING_GROWTH}" \
+        --recording-settle "${RTP_FLOOD_RECORDING_SETTLE}" \
+        --post-flood-linger "${RTP_FLOOD_POST_FLOOD_LINGER}" \
+        --response-window "${RTP_FLOOD_RESPONSE_WINDOW}"
+else
+    echo "[*] Skipping RTP flood check (RUN_RTP_FLOOD_CHECK=${RUN_RTP_FLOOD_CHECK})"
 fi
 
 if [ "${RUN_SIP_FLOOD_CHECK}" = "1" ]; then

@@ -1,8 +1,22 @@
 # pbx1 Scenario Overview
 
-`pbx1` is the current active DVRTC scenario. It models a provider-style SIP deployment with a front-end proxy, back-end PBX, separate media relay, exposed web surface, and intentionally weak support services.
+`pbx1` is the Kamailio/Asterisk/rtpengine scenario in DVRTC. It models a provider-style SIP deployment with a front-end proxy, back-end PBX, separate media relay, exposed web surface, and intentionally weak support services.
 
 This scenario is designed for training and assessment practice across SIP signaling, RTP/media handling, TURN abuse, and SIP-adjacent web/database flaws.
+
+---
+
+Start it with:
+
+```bash
+./scripts/compose.sh --scenario pbx1 up -d
+```
+
+Equivalent raw Compose command:
+
+```bash
+docker compose --project-directory . -p dvrtc-pbx1 -f compose/base.yml -f compose/pbx1.yml up -d
+```
 
 ---
 
@@ -36,7 +50,7 @@ The `pbx1` scenario includes:
 11. **SIP flood**
 12. **Offline credential cracking**
 
-Step-by-step exercise docs currently cover 7 of these paths. The remaining implemented behaviors are described in the component reference docs and can be validated with the `testing` tooling.
+Step-by-step exercise docs currently cover 8 of these paths. The remaining implemented behaviors are described in the component reference docs and can be validated with the `testing` tooling.
 
 The bundled exercises use the tools shipped in the `testing` image, but `pbx1` is a standard SIP/RTP/TURN deployment. Any external VoIP security tool works against it. See [awesome-rtc-hacking](https://github.com/EnableSecurity/awesome-rtc-hacking/?tab=readme-ov-file#open-source-tools) for a curated list.
 
@@ -146,4 +160,4 @@ When `PUBLIC_IPV6` is set, Kamailio, coturn, the web surface, and rtpengine-faci
 ## Notes
 
 - Only one DVRTC scenario runs at a time.
-- `pbx1` is the default and currently active scenario in this repository.
+- `pbx1` is selected explicitly with `./scripts/compose.sh --scenario pbx1 up -d`.

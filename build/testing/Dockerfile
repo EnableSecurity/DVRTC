@@ -35,10 +35,30 @@ RUN git init /tmp/john \
     && /opt/john/run/john --list=formats 2>/dev/null | grep -q "SIP" \
     && rm -rf /tmp/john
 
+FROM python:3.11-slim AS sqlmap-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+ARG SQLMAP_REF=39b8ff4bec7c739973060835c3adaf7bac7447e4
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git init /tmp/sqlmap \
+    && cd /tmp/sqlmap \
+    && git remote add origin https://github.com/sqlmapproject/sqlmap.git \
+    && git fetch --depth 1 origin "${SQLMAP_REF}" \
+    && git checkout --detach FETCH_HEAD \
+    && mkdir -p /opt \
+    && mv /tmp/sqlmap /opt/sqlmap \
+    && rm -rf /opt/sqlmap/.git
+
 FROM python:3.11-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
-ARG SIPVICIOUS_VERSION=0.3.5
+ARG SIPVICIOUS_VERSION=0.3.7
 ARG SCAPY_VERSION=2.7.0
 ARG WEBSOCKETS_VERSION=16.0
 
@@ -75,6 +95,7 @@ RUN pip install --no-cache-dir \
 
 COPY --from=john-builder /opt/john/run /opt/john/run
 COPY --from=john-builder /opt/john/john-wrapper /usr/local/bin/john
+COPY --from=sqlmap-builder /opt/sqlmap /opt/sqlmap
 
 WORKDIR /opt/testing
 
@@ -84,9 +105,17 @@ COPY attacker-run-all.sh /usr/local/bin/attacker-run-all
 COPY smoke.sh /usr/local/bin/testing-smoke
 
 RUN chmod +x /usr/local/bin/testing-run-all /usr/local/bin/attacker-run-all /usr/local/bin/testing-smoke /opt/testing/scripts/*.py \
+    && printf '%s\n' '#!/bin/sh' 'exec python3 /opt/sqlmap/sqlmap.py "$@"' > /usr/local/bin/sqlmap \
+    && chmod +x /usr/local/bin/sqlmap \
     && ln -sf /opt/testing/scripts/rtpbleed.py /usr/local/bin/rtpbleed \
+    && ln -sf /opt/testing/scripts/rtpflood.py /usr/local/bin/rtpflood \
     && ln -sf /opt/testing/scripts/dvrtc-checks.py /usr/local/bin/dvrtc-checks \
-    && ln -sf /opt/testing/scripts/digestleak.py /usr/local/bin/digestleak
+    && ln -sf /opt/testing/scripts/turn-probe.py /usr/local/bin/turn-probe \
+    && ln -sf /opt/testing/scripts/digestleak.py /usr/local/bin/digestleak \
+    && ln -sf /opt/testing/scripts/sqli.py /usr/local/bin/sqli \
+    && ln -sf /opt/testing/scripts/freeswitch-lua-sqli.py /usr/local/bin/freeswitch-lua-sqli \
+    && ln -sf /opt/testing/scripts/sip-sqlmap-harness.py /usr/local/bin/sip-sqlmap-harness \
+    && ln -sf /opt/testing/scripts/xss.py /usr/local/bin/xss
 
 RUN john --list=formats 2>/dev/null | grep -q "SIP" \
     && command -v sipvicious_svwar \
@@ -100,14 +129,22 @@ RUN john --list=formats 2>/dev/null | grep -q "SIP" \
     && command -v iperf3 \
     && command -v sox \
     && command -v curl \
+    && command -v sqlmap \
     && command -v attacker-run-all \
     && command -v rtpbleed \
+    && command -v rtpflood \
     && command -v dvrtc-checks \
+    && command -v turn-probe \
     && command -v digestleak \
+    && command -v sqli \
+    && command -v freeswitch-lua-sqli \
+    && command -v sip-sqlmap-harness \
+    && command -v xss \
     && command -v kamcmd \
     && command -v baresip \
     && python3 -c "import scapy" \
-    && python3 -c "import websockets"
+    && python3 -c "import websockets" \
+    && sqlmap --version
 
 ARG DVRTC_VERSION=dev
 ARG DVRTC_SERVICE=testing

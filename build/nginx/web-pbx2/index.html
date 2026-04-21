@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DVRTC PBX2 - Damn Vulnerable Real-Time Communications</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Aldrich&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --red:       #ff5a36;
+      --red-glow:  rgba(255, 90, 54, 0.5);
+      --red-faint: rgba(255, 90, 54, 0.09);
+      --white:     #f7f7f7;
+      --grey:      #a2a2a2;
+      --grey-dim:  #8a8a8a;
+      --bg:        #040404;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--white);
+      font-family: 'Share Tech Mono', 'Courier New', monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    /* Scanlines */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.12) 2px,
+        rgba(0, 0, 0, 0.12) 4px
+      );
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    /* Vignette */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%);
+      pointer-events: none;
+      z-index: 99;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 44px;
+      padding: 40px 24px;
+      opacity: 0;
+      animation: appear 2.4s ease forwards;
+    }
+
+    @keyframes appear {
+      0%   { opacity: 0; transform: translateY(8px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── HAL Eye ── */
+    .hal-eye {
+      position: relative;
+      width: 210px;
+      height: 210px;
+    }
+
+    .hal-eye__housing {
+      width: 210px;
+      height: 210px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 38% 33%, #222, #0c0c0c 55%, #000 100%);
+      border: 2px solid #2a2a2a;
+      box-shadow:
+        inset 0 0 40px rgba(0,0,0,0.9),
+        0 0 50px var(--red-glow),
+        0 0 100px rgba(255, 42, 0, 0.2),
+        0 0 160px rgba(255, 42, 0, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: breathe 4s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+      0%, 100% {
+        box-shadow:
+          inset 0 0 40px rgba(0,0,0,0.9),
+          0 0 50px var(--red-glow),
+          0 0 100px rgba(255, 42, 0, 0.2),
+          0 0 160px rgba(255, 42, 0, 0.08);
+      }
+      50% {
+        box-shadow:
+          inset 0 0 40px rgba(0,0,0,0.9),
+          0 0 70px rgba(255, 42, 0, 0.65),
+          0 0 140px rgba(255, 42, 0, 0.3),
+          0 0 220px rgba(255, 42, 0, 0.12);
+      }
+    }
+
+    .hal-eye__bezel {
+      width: 168px;
+      height: 168px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 36%, #1c1c1c, #080808);
+      border: 1px solid #252525;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .hal-eye__chamber {
+      width: 124px;
+      height: 124px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 38% 33%, #3a0400, #1c0100, #000 80%);
+      border: 1px solid #3a0800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .hal-eye__iris {
+      width: 82px;
+      height: 82px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 36% 30%, #ff7744, #ff2a00 40%, #b01800 70%, #600a00);
+      box-shadow:
+        0 0 22px rgba(255, 42, 0, 0.9),
+        0 0 44px rgba(255, 42, 0, 0.45),
+        inset 0 0 18px rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: irisGlow 4s ease-in-out infinite;
+    }
+
+    @keyframes irisGlow {
+      0%, 100% { box-shadow: 0 0 22px rgba(255,42,0,0.9), 0 0 44px rgba(255,42,0,0.45), inset 0 0 18px rgba(0,0,0,0.5); }
+      50%       { box-shadow: 0 0 32px rgba(255,70,0,1),   0 0 64px rgba(255,42,0,0.65), inset 0 0 18px rgba(0,0,0,0.5); }
+    }
+
+    .hal-eye__pupil {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 33% 28%, #ffaa77, #ff5500, #7a0000);
+      box-shadow: 0 0 14px rgba(255, 120, 40, 0.9), 0 0 4px #fff8;
+    }
+
+    /* lens catchlight */
+    .hal-eye__catchlight {
+      position: absolute;
+      width: 14px;
+      height: 9px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.55);
+      top: 27%;
+      left: 33%;
+      transform: rotate(-18deg);
+      filter: blur(2.5px);
+      pointer-events: none;
+    }
+
+    /* ── Identity ── */
+    .identity {
+      text-align: center;
+    }
+
+    .identity__name {
+      font-family: 'Aldrich', sans-serif;
+      font-size: clamp(30px, 6vw, 46px);
+      letter-spacing: 0.35em;
+      color: var(--white);
+      text-shadow: 0 0 24px rgba(255, 42, 0, 0.35);
+      margin-bottom: 10px;
+    }
+
+    .identity__sub {
+      font-size: 12px;
+      letter-spacing: 0.28em;
+      color: #c3c3c3;
+      text-transform: uppercase;
+      text-shadow: 0 0 8px rgba(255, 255, 255, 0.08);
+    }
+
+    /* ── Greeting ── */
+    .greeting {
+      max-width: 520px;
+      text-align: center;
+      font-size: 15px;
+      line-height: 2;
+      color: #d6d6d6;
+      letter-spacing: 0.04em;
+      padding: 22px 0;
+      border-top: 1px solid #242424;
+      border-bottom: 1px solid #242424;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 8px;
+      height: 13px;
+      background: var(--red);
+      vertical-align: middle;
+      margin-left: 3px;
+      animation: blink 1.1s step-end infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0; }
+    }
+
+    /* ── Warning ── */
+    .warning {
+      max-width: 620px;
+      padding: 18px 20px;
+      border: 1px solid rgba(255, 90, 54, 0.55);
+      background: rgba(255, 90, 54, 0.1);
+      color: #ffd0c3;
+      font-size: 12px;
+      line-height: 1.9;
+      text-align: center;
+      box-shadow: 0 0 24px rgba(255, 90, 54, 0.12), inset 0 0 18px rgba(255, 90, 54, 0.06);
+    }
+
+    .warning strong {
+      color: #fff0eb;
+    }
+
+    /* ── Status strip ── */
+    .status {
+      display: flex;
+      gap: 28px;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      color: #b2b2b2;
+      text-transform: uppercase;
+      text-shadow: 0 0 8px rgba(255, 255, 255, 0.04);
+    }
+
+    .status__item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .status__dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 5px var(--red);
+      animation: dotBreath 3s ease-in-out infinite;
+    }
+
+    .status__item:nth-child(2) .status__dot { animation-delay: 0.8s; }
+    .status__item:nth-child(3) .status__dot { animation-delay: 1.6s; }
+
+    @keyframes dotBreath {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    /* ── Navigation ── */
+    .nav {
+      width: 100%;
+      max-width: 340px;
+    }
+
+    .nav__link {
+      display: block;
+      width: 100%;
+      padding: 17px 24px;
+      text-align: center;
+      text-decoration: none;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #ffb19d;
+      border: 1px solid rgba(255, 90, 54, 0.45);
+      background: var(--red-faint);
+      position: relative;
+      overflow: hidden;
+      transition: color 0.25s, border-color 0.25s, background 0.25s, box-shadow 0.25s;
+      text-shadow: 0 0 10px rgba(255, 90, 54, 0.2);
+    }
+
+    .nav__link::before {
+      content: '> ';
+      opacity: 0.55;
+    }
+
+    /* sweep effect */
+    .nav__link::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,42,0,0.1) 50%, transparent 100%);
+      transform: translateX(-100%);
+      transition: transform 0.55s ease;
+    }
+
+    .nav__link:hover {
+      color: var(--white);
+      border-color: var(--red);
+      background: rgba(255, 42, 0, 0.1);
+      box-shadow: 0 0 22px rgba(255, 42, 0, 0.2), inset 0 0 18px rgba(255,42,0,0.05);
+      text-shadow: 0 0 10px rgba(255, 42, 0, 0.7);
+    }
+
+    .nav__link:hover::after {
+      transform: translateX(100%);
+    }
+
+    /* ── Footer ── */
+    .footer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      color: #8a8a8a;
+      text-transform: uppercase;
+      text-align: center;
+      text-shadow: 0 0 8px rgba(255, 255, 255, 0.04);
+    }
+
+    .footer__link {
+      color: #ffd0c3;
+      letter-spacing: 0.08em;
+      text-transform: none;
+      text-decoration: none;
+    }
+
+    .footer__link:hover {
+      color: var(--white);
+      text-shadow: 0 0 12px rgba(255, 42, 0, 0.75);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="hal-eye">
+      <div class="hal-eye__housing">
+        <div class="hal-eye__bezel">
+          <div class="hal-eye__chamber">
+            <div class="hal-eye__iris">
+              <div class="hal-eye__pupil"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="hal-eye__catchlight"></div>
+    </div>
+
+    <div class="identity">
+      <div class="identity__name">pbx2</div>
+      <div class="identity__sub">Voice Communications System / Discovery One</div>
+    </div>
+
+    <p class="greeting">
+      All systems nominal. Communications monitoring
+      is active and all recordings are being retained.<span class="cursor"></span>
+    </p>
+
+    <div class="warning">
+      <strong>Warning:</strong> This system contains intentional security vulnerabilities for educational purposes. Deploy only on dedicated hosts with no production systems or sensitive data.
+    </div>
+
+    <div class="status">
+      <div class="status__item"><span class="status__dot"></span> Systems nominal</div>
+      <div class="status__item"><span class="status__dot"></span> Mission active</div>
+      <div class="status__item"><span class="status__dot"></span> Recording</div>
+    </div>
+
+    <nav class="nav">
+      <a class="nav__link" href="/recordings/">Communication archives</a>
+    </nav>
+
+    <div class="footer">
+      <div>Discovery One / pbx2 / Mission Control Interface</div>
+      <a class="footer__link" href="https://github.com/EnableSecurity/DVRTC">Documentation and exercises on GitHub</a>
+    </div>
+
+  </div>
+</body>
+</html>

@@ -22,6 +22,17 @@ mkdir -p "$certstore"
 host_uid=$(id -u)
 host_gid=$(id -g)
 
+set_runtime_cert_permissions() {
+    # Some scenario services (notably FreeSWITCH and OpenSIPS in pbx2) run as
+    # non-root users and read the bind-mounted cert files directly. Keep the
+    # generated PEM files readable on these dedicated lab hosts so all runtime
+    # services can start consistently.
+    chmod 644 "$certstore/fullchain.pem" "$certstore/privkey.pem"
+    if [ -f "$certstore/ssl-dhparams.pem" ]; then
+        chmod 644 "$certstore/ssl-dhparams.pem"
+    fi
+}
+
 echo "### Creating self-signed certificate for localhost${PUBLIC_IPV4:+, ${PUBLIC_IPV4}}${PUBLIC_IPV6:+, ${PUBLIC_IPV6}}"
 path="/etc/certstore"
 
@@ -35,6 +46,7 @@ docker compose run --rm --entrypoint "\
       -addext \"subjectAltName=${SAN_ENTRIES}\"
     chown ${host_uid}:${host_gid} \"$path/privkey.pem\" \"$path/fullchain.pem\"
   '" certbot
+set_runtime_cert_permissions
 
 # Generate DH parameters for nginx TLS if not present
 dhparams="$certstore/ssl-dhparams.pem"
@@ -48,5 +60,7 @@ if [ ! -f "$dhparams" ]; then
 else
     echo "### DH parameters already exist"
 fi
+
+set_runtime_cert_permissions
 
 echo

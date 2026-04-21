@@ -3,6 +3,20 @@
 LOG_LEVEL=${DIGESTLEAK_LOG_LEVEL:-warn}
 SIP_TRACE=${DIGESTLEAK_SIP_TRACE:-0}
 
+select_net_interface() {
+    if [ -n "${BARESIP_NET_INTERFACE:-}" ]; then
+        printf '%s\n' "$BARESIP_NET_INTERFACE"
+        return 0
+    fi
+
+    if [ -r /proc/net/route ]; then
+        awk '$2 == "00000000" { print $1; exit }' /proc/net/route
+        return 0
+    fi
+
+    return 0
+}
+
 log_info() {
     [ "$LOG_LEVEL" = "info" ] || return 0
     echo "$@"
@@ -34,16 +48,28 @@ hangup_loop() {
 # Start hangup loop in background
 hangup_loop &
 
+BARESIP_NET_IFACE="$(select_net_interface)"
+if [ -n "$BARESIP_NET_IFACE" ]; then
+    log_info "Using baresip network interface: ${BARESIP_NET_IFACE}"
+fi
+
+run_baresip() {
+    if [ -n "$BARESIP_NET_IFACE" ]; then
+        exec baresip -n "$BARESIP_NET_IFACE" "$@"
+    fi
+    exec baresip "$@"
+}
+
 # Run baresip - ctrl_tcp keeps it running
 if [ "$LOG_LEVEL" = "info" ]; then
     if [ "$SIP_TRACE" = "1" ]; then
-        exec baresip -f /home/baresip/.baresip -v -s 2>&1
+        run_baresip -f /home/baresip/.baresip -v -s 2>&1
     fi
-    exec baresip -f /home/baresip/.baresip -v 2>&1
+    run_baresip -f /home/baresip/.baresip -v 2>&1
 fi
 
 if [ "$SIP_TRACE" = "1" ]; then
-    exec baresip -f /home/baresip/.baresip -s 2>&1
+    run_baresip -f /home/baresip/.baresip -s 2>&1
 fi
 
-exec baresip -f /home/baresip/.baresip 2>&1
+run_baresip -f /home/baresip/.baresip 2>&1

@@ -15,6 +15,7 @@ When an exercise opens a `testing` or `attacker` shell and tells you to use `/wo
 | 5 | [SIP Digest Leak](05-digest-leak.md) | Exploit extension `2000` to capture digest material and crack it offline |
 | 6 | [TURN Relay Abuse](06-turn-relay-abuse.md) | Abuse coturn relay permissions to reach loopback-only HTTP content |
 | 7 | [Offline SIP Credential Cracking](07-offline-credential-cracking.md) | Capture and crack SIP digest material offline |
+| 8 | [Automated SIP → MySQL Data Exfiltration with sqlmap](08-sqli-automation.md) | Use `sip-sqlmap-harness` and `sqlmap` to dump the seeded `customers` table through the Kamailio User-Agent SQL injection |
 
 ## Related Documentation
 

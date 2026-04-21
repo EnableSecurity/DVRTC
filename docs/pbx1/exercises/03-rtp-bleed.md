@@ -6,7 +6,7 @@ Use the `dvrtc-checks.py rtp-bleed` wrapper in the `attacker` service to probe D
 
 ## Prerequisites
 
-- DVRTC running: `docker compose up -d`
+- DVRTC running: `./scripts/compose.sh --scenario pbx1 up -d`
 - the `dvrtc-checks.py rtp-bleed` helper available in the `attacker` service
 
 ## Steps
@@ -24,7 +24,7 @@ Run on the host:
 Run on the host:
 
 ```bash
-docker compose run --rm attacker python3 /opt/testing/scripts/dvrtc-checks.py rtp-bleed --host "$PUBLIC_IPV4"
+./scripts/compose.sh --scenario pbx1 run --rm attacker dvrtc-checks rtp-bleed --host "$PUBLIC_IPV4"
 ```
 
 This targets the lab's external RTP path and sends the probes from the bridge-networked attacker container.

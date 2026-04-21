@@ -105,8 +105,8 @@ Once Colima is up with bridged networking, use the normal DVRTC setup flow from 
 ./scripts/generate_passwords.sh
 ./scripts/init-selfsigned.sh
 ./scripts/validate_env.sh
-docker compose up -d
-docker compose ps
+./scripts/compose.sh --scenario pbx1 up -d
+./scripts/compose.sh --scenario pbx1 ps
 ```
 
 For host-side access checks from macOS, prefer the bridged `PUBLIC_IPV4` written to `.env`:

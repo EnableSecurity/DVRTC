@@ -28,6 +28,17 @@ mkdir -p "$certstore"
 host_uid=$(id -u)
 host_gid=$(id -g)
 
+set_runtime_cert_permissions() {
+  # Some scenario services (notably FreeSWITCH and OpenSIPS in pbx2) run as
+  # non-root users and read the bind-mounted cert files directly. Keep the
+  # generated PEM files readable on these dedicated lab hosts so all runtime
+  # services can start consistently.
+  chmod 644 "$certstore/fullchain.pem" "$certstore/privkey.pem"
+  if [ -f "$certstore/ssl-dhparams.pem" ]; then
+    chmod 644 "$certstore/ssl-dhparams.pem"
+  fi
+}
+
 echo "### Requesting Let's Encrypt certificate for $domains ..."
 #Join $domains to -d args
 domain_args=""
@@ -53,8 +64,9 @@ docker compose run -p80:80 --rm --entrypoint "\
       --rsa-key-size $rsa_key_size \
       --agree-tos \
       --force-renewal \
-      --deploy-hook \"cp /etc/letsencrypt/live/$DOMAIN/* /etc/certstore && chown ${host_uid}:${host_gid} /etc/certstore/*\"
+      --deploy-hook \"cp /etc/letsencrypt/live/$DOMAIN/* /etc/certstore && chown ${host_uid}:${host_gid} /etc/certstore/* && chmod 644 /etc/certstore/fullchain.pem /etc/certstore/privkey.pem\"
   '" certbot
+set_runtime_cert_permissions
 
 # Generate DH parameters for nginx TLS if not present
 dhparams="$certstore/ssl-dhparams.pem"
@@ -68,5 +80,7 @@ if [ ! -f "$dhparams" ]; then
 else
     echo "### DH parameters already exist"
 fi
+
+set_runtime_cert_permissions
 
 echo

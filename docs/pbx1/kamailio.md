@@ -19,13 +19,13 @@ Kamailio is the public SIP edge for `pbx1`. It accepts SIP over UDP, TCP, TLS, W
 | `build/kamailio/config/kamailio.cfg` | main routing logic and intentional vulnerabilities |
 | `build/kamailio/config/tls.cfg` | TLS settings for SIP/TLS and WSS |
 | `build/kamailio/run.sh` | runtime templating for public IPs, ports, and aliases |
-| `docker-compose.yml` | service wiring, health check, and environment |
+| `compose/pbx1.yml` | service wiring, health check, and environment |
 
 ## Intentionally Vulnerable Behavior
 
 - `ALLOWED_EXTENSIONS` is used to return `404` for unknown extensions and different responses for valid ones, enabling extension enumeration
 - extension `2000` only authenticates `REGISTER`, which supports the digest-leak exercise
-- extension `2000` registrations are only accepted from RFC1918 space or loopback
+- extension `2000` registrations are only accepted from loopback
 - SIP `User-Agent` headers are inserted into MySQL without sanitization, enabling SQL injection
 - the same logged `User-Agent` data is later rendered in the web UI, enabling XSS
 - there is no active SIP request throttling in the routing logic, which supports SIP flood exercises
@@ -45,12 +45,12 @@ Kamailio tracks dialog state for calls to `2000` so in-dialog requests can be ro
 ## Verification
 
 ```bash
-docker compose run --rm testing python3 /opt/testing/scripts/dvrtc-checks.py enum --host 127.0.0.1 --extension 2000
-docker compose run --rm testing python3 /opt/testing/scripts/dvrtc-checks.py digestleak-registered --host 127.0.0.1
-docker compose run --rm testing python3 /opt/testing/scripts/dvrtc-checks.py sqli --host 127.0.0.1 --extension 1000
-docker compose run --rm testing python3 /opt/testing/scripts/dvrtc-checks.py xss --host 127.0.0.1 --extension 1000
-docker compose run --rm testing python3 /opt/testing/scripts/dvrtc-checks.py sip-transport --host 127.0.0.1
-docker compose logs kamailio
+./scripts/compose.sh --scenario pbx1 run --rm testing dvrtc-checks enum --host 127.0.0.1 --extension 2000
+./scripts/compose.sh --scenario pbx1 run --rm testing dvrtc-checks digestleak-registered --host 127.0.0.1
+./scripts/compose.sh --scenario pbx1 run --rm testing sqli --host 127.0.0.1 --extension 1000
+./scripts/compose.sh --scenario pbx1 run --rm testing xss --host 127.0.0.1 --extension 1000
+./scripts/compose.sh --scenario pbx1 run --rm testing dvrtc-checks sip-transport --host 127.0.0.1
+./scripts/compose.sh --scenario pbx1 logs kamailio
 ```
 
 ## Related Documentation

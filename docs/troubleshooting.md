@@ -8,39 +8,42 @@ Run these first before chasing a specific symptom:
 
 ```bash
 # Check service state
-docker compose ps
+./scripts/compose.sh --scenario pbx1 ps
 
 # Validate .env and certificate prerequisites
 ./scripts/validate_env.sh
 
 # Look at logs for the failing service
-docker compose logs kamailio
-docker compose logs asterisk
-docker compose logs db
-docker compose logs nginx
-docker compose logs coturn
+./scripts/compose.sh --scenario pbx1 logs kamailio
+./scripts/compose.sh --scenario pbx1 logs asterisk
+./scripts/compose.sh --scenario pbx1 logs db
+./scripts/compose.sh --scenario pbx1 logs nginx
+./scripts/compose.sh --scenario pbx1 logs coturn
 
 # Run the baseline smoke test
 ./scripts/testing-smoke.sh
 ```
 
-Keep these repo-specific behaviors in mind while reading `docker compose ps`:
+Keep these repo-specific behaviors in mind while reading service state and logs:
 
 - `testing` and `attacker` are behind the `testing` profile, so they do not appear in `docker compose ps` unless you run them explicitly or start the profile.
 - `testing` is host-networked and uses `127.0.0.1` for host-local checks; `attacker` is bridge-networked and uses `PUBLIC_IPV4` for remote-vantage checks.
 - `certbot` is not useful unless `DOMAIN` and `EMAIL` are set. For normal lab use, self-signed certificates from `./scripts/init-selfsigned.sh` are the expected path.
+- plain `docker compose up -d` is not enough to start DVRTC because the base file at `compose/base.yml` does not include a runtime scenario by itself; use `./scripts/compose.sh --scenario pbx1 ...` or `./scripts/compose.sh --scenario pbx2 ...`
+- the examples below use `pbx1` service names; when you are troubleshooting `pbx2`, swap in `--scenario pbx2` and the corresponding service names such as `opensips`, `freeswitch`, `rtpproxy`, and `nginx-pbx2`
 
 ## Setup And Configuration
 
 ### `validate_env.sh` fails
 
-DVRTC expects three setup steps before `docker compose up -d`:
+DVRTC expects three setup steps before starting a scenario:
 
 ```bash
 ./scripts/setup_networking.sh
 ./scripts/generate_passwords.sh
 ./scripts/init-selfsigned.sh
 ./scripts/validate_env.sh
+./scripts/compose.sh --scenario pbx1 up -d
 ```
 
 `./scripts/validate_env.sh` checks the current repo assumptions:
@@ -116,13 +119,13 @@ The main services to care about are:
 Start with:
 
 ```bash
-docker compose ps
-docker compose logs db
-docker compose logs asterisk
-docker compose logs rtpengine
-docker compose logs kamailio
-docker compose logs nginx
-docker compose logs coturn
+./scripts/compose.sh --scenario pbx1 ps
+./scripts/compose.sh --scenario pbx1 logs db
+./scripts/compose.sh --scenario pbx1 logs asterisk
+./scripts/compose.sh --scenario pbx1 logs rtpengine
+./scripts/compose.sh --scenario pbx1 logs kamailio
+./scripts/compose.sh --scenario pbx1 logs nginx
+./scripts/compose.sh --scenario pbx1 logs coturn
 ```
 
 Common current causes:
@@ -137,12 +140,12 @@ Common current causes:
 Use the service name directly:
 
 ```bash
-docker compose logs kamailio
-docker compose logs asterisk
-docker compose logs rtpengine
-docker compose logs db
-docker compose logs nginx
-docker compose logs coturn
+./scripts/compose.sh --scenario pbx1 logs kamailio
+./scripts/compose.sh --scenario pbx1 logs asterisk
+./scripts/compose.sh --scenario pbx1 logs rtpengine
+./scripts/compose.sh --scenario pbx1 logs db
+./scripts/compose.sh --scenario pbx1 logs nginx
+./scripts/compose.sh --scenario pbx1 logs coturn
 ```
 
 Current repo-specific checks:
@@ -156,6 +159,7 @@ Current repo-specific checks:
 ### Port conflicts
 
 DVRTC relies on host networking for the core RTC services. If you already have SIP, TURN, HTTP, HTTPS, or MySQL services running on the host, DVRTC may fail to bind.
+This also means `pbx1` and `pbx2` cannot run at the same time on the same host: the two scenarios reuse overlapping host ports and RTP ranges.
 
 The most important ports are:
 
@@ -188,16 +192,18 @@ sudo lsof -nP -i :23306
 Use the repo's transport checks instead of guessing:
 
 ```bash
-docker compose run --rm testing python3 /opt/testing/scripts/dvrtc-checks.py sip-transport --host 127.0.0.1
-docker compose run --rm testing python3 /opt/testing/scripts/dvrtc-checks.py wss-register --host 127.0.0.1
+./scripts/compose.sh --scenario pbx1 run --rm testing dvrtc-checks sip-transport --host 127.0.0.1
+./scripts/compose.sh --scenario pbx1 run --rm testing dvrtc-checks wss-register --host 127.0.0.1
 ```
+
+`wss-register` applies to `pbx1`. When troubleshooting `pbx2`, use `./scripts/compose.sh --scenario pbx2 run --rm testing dvrtc-checks sip-transport --scenario pbx2 --host 127.0.0.1` instead because `pbx2` does not expose a browser/WebRTC WSS endpoint.
 
 If only TLS or WSS is failing, check certificates first:
 
 ```bash
 ls -la data/certs/
-docker compose logs kamailio
-docker compose logs nginx
+./scripts/compose.sh --scenario pbx1 logs kamailio
+./scripts/compose.sh --scenario pbx1 logs nginx
 ```
 
 If the stack is reachable on IPv4 but not IPv6, re-check `PUBLIC_IPV6` in `.env`. When you browse or test an IPv6 HTTP endpoint, use brackets in the URL, for example `http://[2001:db8::1]/`.
@@ -210,7 +216,7 @@ Check the advertised address from `.env` first:
 grep '^PUBLIC_IPV4=' .env
 . ./.env
 curl "http://${PUBLIC_IPV4}/"
-docker compose logs nginx
+./scripts/compose.sh --scenario pbx1 logs nginx
 ```
 
 Platform note:
@@ -243,13 +249,13 @@ Check the current state:
 
 ```bash
 grep '^PUBLIC_IPV' .env
-docker compose logs asterisk
-docker compose logs rtpengine
-docker compose logs baresip-callgen
-docker compose logs baresip-callgen-b
-docker compose logs baresip-callgen-c
-docker compose run --rm testing python3 /opt/testing/scripts/dvrtc-checks.py callgen-active --host 127.0.0.1
-docker compose run --rm testing python3 /opt/testing/scripts/dvrtc-checks.py rtp-bleed --host 127.0.0.1
+./scripts/compose.sh --scenario pbx1 logs asterisk
+./scripts/compose.sh --scenario pbx1 logs rtpengine
+./scripts/compose.sh --scenario pbx1 logs baresip-callgen
+./scripts/compose.sh --scenario pbx1 logs baresip-callgen-b
+./scripts/compose.sh --scenario pbx1 logs baresip-callgen-c
+./scripts/compose.sh --scenario pbx1 run --rm testing dvrtc-checks callgen-active --host 127.0.0.1
+./scripts/compose.sh --scenario pbx1 run --rm testing dvrtc-checks rtp-bleed --host 127.0.0.1
 ```
 
 If SIP works but media does not, fix addressing and UDP reachability before changing service configs.
@@ -259,9 +265,9 @@ If SIP works but media does not, fix addressing and UDP reachability before chan
 The current TURN-specific check is:
 
 ```bash
-docker compose logs coturn
+./scripts/compose.sh --scenario pbx1 logs coturn
 . ./.env
-docker compose run --rm attacker python3 /opt/testing/scripts/turn-probe.py tcp-http-get --host "$PUBLIC_IPV4" --username user --password joshua --peer 127.0.0.1 --path /secret/
+./scripts/compose.sh --scenario pbx1 run --rm attacker turn-probe tcp-http-get --host "$PUBLIC_IPV4" --username user --password joshua --peer 127.0.0.1 --path /secret/
 ```
 
 If you want the broader remote-vantage suite after the TURN probe passes, run `./scripts/attacker-run-all.sh`.
@@ -269,33 +275,33 @@ If you want the broader remote-vantage suite after the TURN probe passes, run `.
 Verify these repo assumptions:
 
 - coturn is listening on `3478`
-- the weak credential pair is still `user` / `joshua`
+- the weak credential pair is `user` / `joshua`
 - `PUBLIC_IPV4` is reachable from the attacking client
 
 ## Local Development Builds
 
 If the problem only appears after rebuilding images locally, use the maintainer workflow in [development.md](development.md).
 
-The most common mistake is forgetting `--profile testing` when building `testing` or `attacker`. The `platform: linux/amd64` constraint is set on every service in `docker-compose.yml`, so no `DOCKER_DEFAULT_PLATFORM` env var is needed when both compose files are used together.
+The most common mistake is forgetting `--profile testing` when building `testing` or `attacker`. The `platform: linux/amd64` constraint is set on the scenario runtime services, so no `DOCKER_DEFAULT_PLATFORM` env var is needed when the base and scenario compose files are used together.
 
 ## Resetting The Lab
 
 If you want to restart the services without deleting state:
 
 ```bash
-docker compose down
-docker compose up -d
+docker compose --project-directory . -p dvrtc-pbx1 -f compose/base.yml -f compose/pbx1.yml down
+./scripts/compose.sh --scenario pbx1 up -d
 ```
 
 If you want a clean reset and are willing to delete voicemail, MySQL state, and generated web artifacts:
 
 ```bash
-docker compose down -v
+docker compose --project-directory . -p dvrtc-pbx1 -f compose/base.yml -f compose/pbx1.yml down -v
 ./scripts/setup_networking.sh
 ./scripts/generate_passwords.sh
 ./scripts/init-selfsigned.sh
 ./scripts/validate_env.sh
-docker compose up -d
+./scripts/compose.sh --scenario pbx1 up -d
 ```
 
 Use the destructive reset only when you are explicitly okay with losing lab state.
@@ -313,13 +319,13 @@ DVRTC's core services use host networking. The supported path is a Linux Docker 
 When you report a problem, include the commands that answer these questions:
 
 ```bash
-docker compose ps
+./scripts/compose.sh --scenario pbx1 ps
 ./scripts/validate_env.sh
-docker compose logs kamailio
-docker compose logs asterisk
-docker compose logs db
-docker compose logs nginx
-docker compose logs coturn
+./scripts/compose.sh --scenario pbx1 logs kamailio
+./scripts/compose.sh --scenario pbx1 logs asterisk
+./scripts/compose.sh --scenario pbx1 logs db
+./scripts/compose.sh --scenario pbx1 logs nginx
+./scripts/compose.sh --scenario pbx1 logs coturn
 ./scripts/testing-smoke.sh
 ```
 

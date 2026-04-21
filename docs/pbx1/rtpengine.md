@@ -20,7 +20,7 @@ The current setup is intentionally permissive to support RTP bleed, injection, a
 | `build/rtpengine/run.sh` | launches `rtpengine` with the DVRTC port range and interfaces |
 | `build/rtpengine/healthcheck/healthcheck.sh` | service health validation |
 | `build/kamailio/config/kamailio.cfg` | `rtpengine` control commands and SDP handling |
-| `docker-compose.yml` | runtime wiring, health check, and host-network setup |
+| `compose/pbx1.yml` | runtime wiring, health check, and host-network setup |
 
 ## Intentionally Vulnerable Behavior
 
@@ -31,8 +31,8 @@ The current setup is intentionally permissive to support RTP bleed, injection, a
 ## Verification
 
 ```bash
-docker compose run --rm testing python3 /opt/testing/scripts/dvrtc-checks.py rtp-bleed --host 127.0.0.1
-docker compose logs rtpengine
+./scripts/compose.sh --scenario pbx1 run --rm testing dvrtc-checks rtp-bleed --host 127.0.0.1
+./scripts/compose.sh --scenario pbx1 logs rtpengine
 ```
 
 ## Related Documentation
