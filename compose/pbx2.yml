@@ -19,7 +19,7 @@ services:
   # FreeSWITCH PBX - Backend call processing for pbx2
   # INTENTIONALLY VULNERABLE: Weak password (1000:1500), Lua SQLi demo on 2001 with hidden 9000 access, no rate limiting
   freeswitch:
-    image: ghcr.io/enablesecurity/dvrtc/pbx2-freeswitch:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/pbx2-freeswitch:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -43,7 +43,7 @@ services:
 
   # rtpproxy - Media proxy with unconditional RTP recording for pbx2
   rtpproxy:
-    image: ghcr.io/enablesecurity/dvrtc/pbx2-rtpproxy:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/pbx2-rtpproxy:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -65,7 +65,7 @@ services:
   # OpenSIPS - SIP proxy/registrar for pbx2
   # INTENTIONALLY VULNERABLE: Distinct INVITE outcomes leak extension state; extension 2000 digest leak behavior
   opensips:
-    image: ghcr.io/enablesecurity/dvrtc/pbx2-opensips:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/pbx2-opensips:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -84,6 +84,7 @@ services:
     environment:
       <<: *required-public-ipv4
       PUBLIC_IPV6: "${PUBLIC_IPV6:-}"
+      OPENSIPS_SHM_MB: "${OPENSIPS_SHM_MB:-128}"
       EMAIL: "${EMAIL:-}"
       DOMAIN: "${DOMAIN:-}"
     volumes:
@@ -92,13 +93,14 @@ services:
         target: /etc/certstore
 
   baresip-callgen-pbx2:
-    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
     network_mode: "host"
     environment:
       SIPCALLER1_PASSWORD: "${SIPCALLER1_PASSWORD:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before starting a scenario with './scripts/compose.sh --scenario pbx1 up -d' or './scripts/compose.sh --scenario pbx2 up -d'. See README.md Initial Setup.}"
+      CTRL_TCP_PORT: 4445
       CALL_DEST: 1300
       CALL_DURATION: 20
       CALL_PAUSE: 0
@@ -112,13 +114,14 @@ services:
         restart: true
 
   baresip-callgen-b-pbx2:
-    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
     network_mode: "host"
     environment:
       SIPCALLER1_PASSWORD: "${SIPCALLER1_PASSWORD:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before starting a scenario with './scripts/compose.sh --scenario pbx1 up -d' or './scripts/compose.sh --scenario pbx2 up -d'. See README.md Initial Setup.}"
+      CTRL_TCP_PORT: 4446
       CALL_DEST: 1300
       CALL_DURATION: 20
       CALL_PAUSE: 0
@@ -132,13 +135,14 @@ services:
         restart: true
 
   baresip-callgen-c-pbx2:
-    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
     network_mode: "host"
     environment:
       SIPCALLER1_PASSWORD: "${SIPCALLER1_PASSWORD:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before starting a scenario with './scripts/compose.sh --scenario pbx1 up -d' or './scripts/compose.sh --scenario pbx2 up -d'. See README.md Initial Setup.}"
+      CTRL_TCP_PORT: 4447
       CALL_DEST: 1300
       CALL_DURATION: 20
       CALL_PAUSE: 0
@@ -152,7 +156,7 @@ services:
         restart: true
 
   baresip-digestleak-pbx2:
-    image: ghcr.io/enablesecurity/dvrtc/baresip-digestleak:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/baresip-digestleak:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -163,7 +167,7 @@ services:
         restart: true
 
   nginx-pbx2:
-    image: ghcr.io/enablesecurity/dvrtc/nginx:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/nginx:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -192,7 +196,7 @@ services:
       start_period: 10s
 
   recordingscleaner:
-    image: ghcr.io/enablesecurity/dvrtc/voicemailcleaner:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/voicemailcleaner:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped

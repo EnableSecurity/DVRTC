@@ -4,6 +4,14 @@ set -eu
 
 # Default to 0.0.0.0 if PUBLIC_IPV4 not set (for local testing)
 PUBLIC_IPV4="${PUBLIC_IPV4:-0.0.0.0}"
+OPENSIPS_SHM_MB="${OPENSIPS_SHM_MB:-128}"
+
+case "$OPENSIPS_SHM_MB" in
+    ''|*[!0-9]*)
+        echo "Invalid OPENSIPS_SHM_MB: $OPENSIPS_SHM_MB" >&2
+        exit 1
+        ;;
+esac
 
 # Build listen addresses
 LISTEN="-l udp:$PUBLIC_IPV4:5060 -l tcp:$PUBLIC_IPV4:5060"
@@ -35,4 +43,4 @@ if [ -f /etc/certstore/fullchain.pem ] && [ -f /etc/certstore/privkey.pem ]; the
     chmod 640 /etc/certstore/privkey.pem || true
 fi
 
-exec opensips -F $LISTEN
+exec opensips -F -m "$OPENSIPS_SHM_MB" $LISTEN

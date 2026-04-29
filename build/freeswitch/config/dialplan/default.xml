@@ -72,6 +72,8 @@
   <extension name="1300">
     <condition field="destination_number" expression="^1300$">
       <action application="answer"/>
+      <!-- Keep leaked helper calls from persisting forever if a call generator crashes. -->
+      <action application="sched_hangup" data="+35 NORMAL_CLEARING"/>
       <action application="echo"/>
     </condition>
   </extension>

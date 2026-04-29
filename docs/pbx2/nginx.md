@@ -25,6 +25,7 @@ Nginx provides the HTTP and HTTPS surface for `pbx2`. It serves the scenario lan
 ## Current Web Surface
 
 - `/recordings/` has fancy directory indexing enabled via the `fancyindex` module
+- the pbx2 landing page and recordings directory stylesheet follow the browser/system light or dark color preference with CSS `prefers-color-scheme`
 - the active recording spool is reachable below `/recordings/spool/`
 - both HTTP and HTTPS expose the same recordings surface
 - the landing page links directly to the recording index and to the DVRTC GitHub documentation

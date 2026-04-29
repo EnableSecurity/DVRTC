@@ -1,24 +1,98 @@
 @import url('https://fonts.googleapis.com/css2?family=Aldrich&family=Share+Tech+Mono&display=swap');
 
 :root {
-  --red: #ff2a00;
-  --red-glow: rgba(255, 42, 0, 0.45);
-  --red-faint: rgba(255, 42, 0, 0.08);
-  --white: #efefef;
-  --grey: #888;
-  --line: rgba(255, 42, 0, 0.22);
-  --bg: #040404;
+  color-scheme: dark;
+  --accent: #ff2a00;
+  --accent-strong: #ff8b72;
+  --accent-glow: rgba(255, 42, 0, 0.45);
+  --accent-faint: rgba(255, 42, 0, 0.08);
+  --text: #efefef;
+  --text-strong: #f5f5f5;
+  --border: rgba(255, 42, 0, 0.22);
+  --border-soft: rgba(255, 42, 0, 0.12);
+  --page-bg: #040404;
+  --page-radial-start: #101010;
+  --page-radial-mid: #040404;
+  --page-radial-end: #000000;
+  --scanline: rgba(0, 0, 0, 0.14);
+  --panel-bg: rgba(0, 0, 0, 0.5);
+  --row-bg: rgba(0, 0, 0, 0.72);
+  --row-alt-bg: rgba(18, 5, 2, 0.72);
+  --header-bg: rgba(255, 42, 0, 0.06);
+  --title-bg-top: rgba(255, 42, 0, 0.08);
+  --title-bg-bottom: rgba(255, 42, 0, 0.03);
+  --title-shadow: 0 0 28px rgba(255, 42, 0, 0.12), inset 0 0 20px rgba(255, 42, 0, 0.04);
+  --table-shadow: 0 0 30px rgba(255, 42, 0, 0.08);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --accent: #a30f00;
+    --accent-strong: #7d0d00;
+    --accent-glow: rgba(163, 15, 0, 0.22);
+    --accent-faint: rgba(163, 15, 0, 0.09);
+    --text: #231914;
+    --text-strong: #160f0d;
+    --border: rgba(125, 13, 0, 0.18);
+    --border-soft: rgba(125, 13, 0, 0.10);
+    --page-bg: #f2ebe4;
+    --page-radial-start: #fffaf6;
+    --page-radial-mid: #f4ece6;
+    --page-radial-end: #e6d9cf;
+    --scanline: rgba(255, 255, 255, 0.14);
+    --panel-bg: rgba(255, 253, 250, 0.84);
+    --row-bg: rgba(255, 252, 249, 0.90);
+    --row-alt-bg: rgba(243, 232, 225, 0.94);
+    --header-bg: linear-gradient(180deg, rgba(163, 15, 0, 0.12), rgba(163, 15, 0, 0.04));
+    --title-bg-top: rgba(163, 15, 0, 0.10);
+    --title-bg-bottom: rgba(255, 252, 248, 0.78);
+    --title-shadow: 0 14px 36px rgba(110, 53, 35, 0.10), inset 0 0 0 rgba(0, 0, 0, 0);
+    --table-shadow: 0 18px 42px rgba(110, 53, 35, 0.10);
+  }
+
+  body::before {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.10) 22%, transparent 44%),
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        var(--scanline) 2px,
+        var(--scanline) 4px
+      );
+  }
+
+  body::after {
+    text-shadow: 0 0 14px var(--accent-glow), 0 0 2px rgba(255, 255, 255, 0.5);
+  }
+
+  h1 {
+    letter-spacing: 0.2em;
+  }
+
+  table {
+    box-shadow: var(--table-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  }
+
+  th {
+    box-shadow: inset 0 -1px 0 rgba(125, 13, 0, 0.10);
+  }
+
+  tbody tr:hover td {
+    background: rgba(163, 15, 0, 0.11);
+  }
 }
 
 html {
-  background: var(--bg);
+  background: var(--page-bg);
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(circle at center, #101010 0%, #040404 55%, #000000 100%);
-  color: var(--white);
+  background: radial-gradient(circle at center, var(--page-radial-start) 0%, var(--page-radial-mid) 55%, var(--page-radial-end) 100%);
+  color: var(--text);
   font-family: 'Share Tech Mono', 'Courier New', monospace;
   font-size: 15px;
   line-height: 1.7;
@@ -33,8 +107,8 @@ body::before {
     0deg,
     transparent,
     transparent 2px,
-    rgba(0, 0, 0, 0.14) 2px,
-    rgba(0, 0, 0, 0.14) 4px
+    var(--scanline) 2px,
+    var(--scanline) 4px
   );
   pointer-events: none;
 }
@@ -44,25 +118,25 @@ body::after {
   display: block;
   margin: 0;
   padding: 30px 28px 14px;
-  color: var(--red);
+  color: var(--accent);
   font-family: 'Aldrich', sans-serif;
   font-size: 24px;
   letter-spacing: 0.24em;
   text-transform: uppercase;
-  text-shadow: 0 0 18px var(--red-glow);
+  text-shadow: 0 0 18px var(--accent-glow);
 }
 
 h1 {
   margin: 0 28px 22px;
   padding: 18px 22px;
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255, 42, 0, 0.08), rgba(255, 42, 0, 0.03));
-  color: #f5f5f5;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--title-bg-top), var(--title-bg-bottom));
+  color: var(--text-strong);
   font-family: 'Aldrich', sans-serif;
   font-size: 18px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  box-shadow: 0 0 28px rgba(255, 42, 0, 0.12), inset 0 0 20px rgba(255, 42, 0, 0.04);
+  box-shadow: var(--title-shadow);
   word-break: break-word;
 }
 
@@ -72,48 +146,48 @@ address {
 }
 
 a {
-  color: var(--red);
+  color: var(--accent);
   text-decoration: none;
 }
 
 a:hover {
-  color: var(--white);
-  text-shadow: 0 0 12px var(--red-glow);
+  color: var(--text-strong);
+  text-shadow: 0 0 12px var(--accent-glow);
 }
 
 table {
   width: calc(100% - 56px);
   margin: 0 28px 36px;
   border-collapse: collapse;
-  border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.5);
-  box-shadow: 0 0 30px rgba(255, 42, 0, 0.08);
+  border: 1px solid var(--border);
+  background: var(--panel-bg);
+  box-shadow: var(--table-shadow);
 }
 
 th,
 td {
   padding: 14px 16px;
-  border-bottom: 1px solid rgba(255, 42, 0, 0.12);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 th {
-  color: #ff8b72;
-  background: rgba(255, 42, 0, 0.06);
+  color: var(--accent-strong);
+  background: var(--header-bg);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-size: 12px;
 }
 
 tbody tr {
-  background: rgba(0, 0, 0, 0.72);
+  background: var(--row-bg);
 }
 
 tbody tr:nth-child(even) {
-  background: rgba(18, 5, 2, 0.72);
+  background: var(--row-alt-bg);
 }
 
 tbody tr:hover td {
-  background: var(--red-faint);
+  background: var(--accent-faint);
 }
 
 th:nth-child(2),
@@ -138,6 +212,7 @@ td:nth-child(3) {
     padding: 14px 16px;
     font-size: 14px;
   }
+
 
   table {
     width: calc(100% - 32px);

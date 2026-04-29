@@ -9,6 +9,7 @@ OpenSIPS is the public SIP edge for `pbx2`. It accepts SIP over UDP, TCP, and TL
 - `rtpproxy` control via UDP on `127.0.0.1:7722`
 - forwarding of normal registrations and calls to FreeSWITCH on `127.0.0.1:5090/UDP`
 - a dedicated loopback-only registration path for extension `2000`
+- shared memory set by `OPENSIPS_SHM_MB`, defaulting to `128` MB
 - no WS or WSS browser signaling path in this scenario
 
 ## Key Files
@@ -40,6 +41,10 @@ OpenSIPS is the public SIP edge for `pbx2`. It accepts SIP over UDP, TCP, and TL
 ### Transport Exposure
 
 `build/opensips/run.sh` builds listeners from `PUBLIC_IPV4`, optional `PUBLIC_IPV6`, and loopback. This means the proxy stays reachable on `127.0.0.1:5060` for local service traffic even when the public bind address is a specific host IP.
+
+### Shared Memory
+
+`OPENSIPS_SHM_MB` defaults to `128` MB. This keeps flood exercises from immediately exhausting transaction shared memory while preserving the intentionally vulnerable lack of SIP request throttling.
 
 ## Verification
 

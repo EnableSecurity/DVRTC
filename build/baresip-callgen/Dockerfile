@@ -2,6 +2,7 @@ FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     baresip-core \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 # Create baresip user

@@ -12,7 +12,7 @@ services:
   # Testing runner - one-off host-local capture, diagnostics, and regression checks
   # Use with: docker compose -f compose/base.yml -f compose/<scenario>.yml run --rm testing ...
   testing:
-    image: ghcr.io/enablesecurity/dvrtc/testing:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/testing:v0.2.1
     platform: linux/amd64
     network_mode: "host"
     privileged: true
@@ -29,7 +29,7 @@ services:
   # Attacker runner - one-off bridge-networked remote attack vantage point
   # Use with: docker compose -f compose/base.yml -f compose/<scenario>.yml run --rm attacker ...
   attacker:
-    image: ghcr.io/enablesecurity/dvrtc/testing:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/testing:v0.2.1
     platform: linux/amd64
     environment:
       PUBLIC_IPV4: "${PUBLIC_IPV4:-}"

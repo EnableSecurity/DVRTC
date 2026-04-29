@@ -130,9 +130,10 @@ WORKDIR /opt/freeswitch/conf
 RUN rm -rf /opt/freeswitch/conf/*
 COPY config/ /opt/freeswitch/conf/
 COPY scripts/ /opt/freeswitch/scripts/
-COPY sounds/ /opt/freeswitch/share/freeswitch/sounds/en/us/callie/dvrtc/8000/
+COPY sounds/*.wav /opt/freeswitch/share/freeswitch/sounds/en/us/callie/dvrtc/8000/
+COPY sounds/ivr/ /opt/freeswitch/share/freeswitch/sounds/ivr/
 
-RUN chown -R freeswitch:freeswitch /opt/freeswitch/conf /opt/freeswitch/scripts /opt/freeswitch/share/freeswitch/sounds/en/us/callie/dvrtc
+RUN chown -R freeswitch:freeswitch /opt/freeswitch/conf /opt/freeswitch/scripts /opt/freeswitch/share/freeswitch/sounds/en/us/callie/dvrtc /opt/freeswitch/share/freeswitch/sounds/ivr
 
 COPY --chmod=755 healthcheck/healthcheck.sh /usr/local/bin/freeswitch-healthcheck
 COPY run.sh /opt/run.sh

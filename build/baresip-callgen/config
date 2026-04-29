@@ -19,7 +19,14 @@ net_af			ipv4
 
 # Call settings
 call_local_timeout	60
-call_max_calls		5
+# Keep one active call per helper. This avoids local overlap if a previous
+# hangup has not completed yet.
+call_max_calls		1
+
+# ctrl_tcp for in-process dial / hangup control. Keeping a single baresip
+# process alive avoids repeated process teardown/startup churn. The port is
+# templated per service because the call generators share the host network.
+ctrl_tcp_listen		127.0.0.1:__CTRL_TCP_PORT__
 
 # Audio format - must match WAV files (8kHz mono)
 audio_srate		8000
@@ -34,6 +41,7 @@ module			account.so
 module			g711.so
 module			aufile.so
 module			uuid.so
+module			ctrl_tcp.so
 
 # Auto answer off - we're making calls, not receiving
 auto_answer		no

@@ -70,13 +70,27 @@ esac
 export DVRTC_VERSION="$VERSION"
 export VCS_REF="$VCS_REF"
 export DVRTC_SOURCE="${DVRTC_SOURCE:-$DEFAULT_SOURCE_URL}"
+export PUBLIC_IPV4="${PUBLIC_IPV4:-127.0.0.1}"
+export PUBLIC_IPV6="${PUBLIC_IPV6:-}"
+export MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-dvrtc-build}"
+export SIPCALLER1_PASSWORD="${SIPCALLER1_PASSWORD:-dvrtc-build}"
+export EMAIL="${EMAIL:-}"
+export DOMAIN="${DOMAIN:-}"
+
+compose_release() {
+    if [ -f "$ENV_FILE" ]; then
+        docker compose --env-file "$ENV_FILE" --project-directory "$REPO_ROOT" "$@"
+    else
+        docker compose --project-directory "$REPO_ROOT" "$@"
+    fi
+}
 
 echo "Building release images for ${VERSION}"
-docker compose --env-file "$ENV_FILE" --project-directory "$REPO_ROOT" -f "$BASE_COMPOSE_FILE" -f "$SCENARIO_COMPOSE_FILE" -f "$BASE_DEV_COMPOSE_FILE" -f "$SCENARIO_DEV_COMPOSE_FILE" build $SERVICES
-docker compose --env-file "$ENV_FILE" --project-directory "$REPO_ROOT" -f "$BASE_COMPOSE_FILE" -f "$SCENARIO_COMPOSE_FILE" -f "$BASE_DEV_COMPOSE_FILE" -f "$SCENARIO_DEV_COMPOSE_FILE" --profile testing build "$TESTING_SERVICE"
+compose_release -f "$BASE_COMPOSE_FILE" -f "$SCENARIO_COMPOSE_FILE" -f "$BASE_DEV_COMPOSE_FILE" -f "$SCENARIO_DEV_COMPOSE_FILE" build $SERVICES
+compose_release -f "$BASE_COMPOSE_FILE" -f "$SCENARIO_COMPOSE_FILE" -f "$BASE_DEV_COMPOSE_FILE" -f "$SCENARIO_DEV_COMPOSE_FILE" --profile testing build "$TESTING_SERVICE"
 
 if [ "$PUSH" -eq 1 ]; then
     echo "Pushing release images for ${VERSION}"
-    docker compose --env-file "$ENV_FILE" --project-directory "$REPO_ROOT" -f "$BASE_COMPOSE_FILE" -f "$SCENARIO_COMPOSE_FILE" -f "$BASE_DEV_COMPOSE_FILE" -f "$SCENARIO_DEV_COMPOSE_FILE" push $SERVICES
-    docker compose --env-file "$ENV_FILE" --project-directory "$REPO_ROOT" -f "$BASE_COMPOSE_FILE" -f "$SCENARIO_COMPOSE_FILE" -f "$BASE_DEV_COMPOSE_FILE" -f "$SCENARIO_DEV_COMPOSE_FILE" --profile testing push "$TESTING_SERVICE"
+    compose_release -f "$BASE_COMPOSE_FILE" -f "$SCENARIO_COMPOSE_FILE" -f "$BASE_DEV_COMPOSE_FILE" -f "$SCENARIO_DEV_COMPOSE_FILE" push $SERVICES
+    compose_release -f "$BASE_COMPOSE_FILE" -f "$SCENARIO_COMPOSE_FILE" -f "$BASE_DEV_COMPOSE_FILE" -f "$SCENARIO_DEV_COMPOSE_FILE" --profile testing push "$TESTING_SERVICE"
 fi

@@ -23,7 +23,7 @@ services:
   # Asterisk PBX - Backend call processing
   # INTENTIONALLY VULNERABLE: Weak passwords (1000:1500), no rate limiting, RTP vulnerabilities
   asterisk:
-    image: ghcr.io/enablesecurity/dvrtc/asterisk:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/asterisk:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -48,7 +48,7 @@ services:
   # RTPEngine - Media proxy for RTP/SRTP
   # INTENTIONALLY VULNERABLE: Configured to allow RTP bleed and injection attacks
   rtpengine:
-    image: ghcr.io/enablesecurity/dvrtc/rtpengine:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/rtpengine:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -66,7 +66,7 @@ services:
   # Kamailio - SIP proxy/registrar (front-end)
   # INTENTIONALLY VULNERABLE: Returns detailed responses enabling enumeration, extension 2000 digest leak
   kamailio:
-    image: ghcr.io/enablesecurity/dvrtc/kamailio:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/kamailio:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -101,13 +101,14 @@ services:
   # Baresip Call Generators - Lightweight SIP clients for automated calls
   # Three staggered callers keep extension 1300 busy for RTP bleed demos
   baresip-callgen:
-    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
     network_mode: "host"
     environment:
       SIPCALLER1_PASSWORD: "${SIPCALLER1_PASSWORD:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before starting a scenario with './scripts/compose.sh --scenario pbx1 up -d' or './scripts/compose.sh --scenario pbx2 up -d'. See README.md Initial Setup.}"
+      CTRL_TCP_PORT: 4445
       CALL_DEST: 1300
       CALL_DURATION: 20
       CALL_PAUSE: 0
@@ -121,13 +122,14 @@ services:
         restart: true
 
   baresip-callgen-b:
-    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
     network_mode: "host"
     environment:
       SIPCALLER1_PASSWORD: "${SIPCALLER1_PASSWORD:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before starting a scenario with './scripts/compose.sh --scenario pbx1 up -d' or './scripts/compose.sh --scenario pbx2 up -d'. See README.md Initial Setup.}"
+      CTRL_TCP_PORT: 4446
       CALL_DEST: 1300
       CALL_DURATION: 20
       CALL_PAUSE: 0
@@ -141,13 +143,14 @@ services:
         restart: true
 
   baresip-callgen-c:
-    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/baresip-callgen:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
     network_mode: "host"
     environment:
       SIPCALLER1_PASSWORD: "${SIPCALLER1_PASSWORD:?DVRTC setup incomplete: run ./scripts/setup_networking.sh, ./scripts/generate_passwords.sh, and ./scripts/init-selfsigned.sh before starting a scenario with './scripts/compose.sh --scenario pbx1 up -d' or './scripts/compose.sh --scenario pbx2 up -d'. See README.md Initial Setup.}"
+      CTRL_TCP_PORT: 4447
       CALL_DEST: 1300
       CALL_DURATION: 20
       CALL_PAUSE: 0
@@ -162,7 +165,7 @@ services:
 
   # Baresip Digest Leak - Registers extension 2000 for digest leak demonstration
   baresip-digestleak:
-    image: ghcr.io/enablesecurity/dvrtc/baresip-digestleak:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/baresip-digestleak:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -175,7 +178,7 @@ services:
   # Nginx - Web server
   # INTENTIONALLY VULNERABLE: Exposes voicemail directory listing and user-agent logs
   nginx:
-    image: ghcr.io/enablesecurity/dvrtc/nginx:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/nginx:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -207,7 +210,7 @@ services:
 
   # Voicemail Cleaner - Prevents disk exhaustion from testing
   voicemailcleaner:
-    image: ghcr.io/enablesecurity/dvrtc/voicemailcleaner:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/voicemailcleaner:v0.2.1
     platform: linux/amd64
     logging: *default-logging
     restart: unless-stopped
@@ -302,7 +305,7 @@ services:
 
   # MySQL Client - Exports user-agent statistics to JSON
   mysqlclient:
-    image: ghcr.io/enablesecurity/dvrtc/mysqlclient:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/mysqlclient:v0.2.1
     platform: linux/amd64
     volumes:
       - type: volume
@@ -319,7 +322,7 @@ services:
 
   # Database Cleaner - Truncates user-agent table hourly
   dbcleaner:
-    image: ghcr.io/enablesecurity/dvrtc/dbcleaner:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/dbcleaner:v0.2.1
     platform: linux/amd64
     network_mode: "host"
     environment:
@@ -333,7 +336,7 @@ services:
   # MySQL Database
   # INTENTIONALLY VULNERABLE: Exposed on non-standard port with hardcoded password (kamailiorw)
   db:
-    image: ghcr.io/enablesecurity/dvrtc/db:v0.2.0
+    image: ghcr.io/enablesecurity/dvrtc/db:v0.2.1
     platform: linux/amd64
     network_mode: "host"
     environment:
